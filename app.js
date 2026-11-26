@@ -1,8 +1,8 @@
 /* ==========================================================================
    이솔 비서실 — app.js
    정적 파일만으로 동작하는 프론트엔드.
-   · config.js에 Supabase 키가 있으면 REST + Realtime 동기화
-   · 키가 없으면 localStorage 데모 모드 (화면 기능은 동일)
+   · config.js에 Supabase 키가 있으면 로그인(이메일+비밀번호) 후 REST + Realtime 동기화
+   · 키가 없으면 localStorage 데모 모드 (로그인 화면 없이 화면 기능은 동일)
    ========================================================================== */
 
 (function () {
@@ -134,6 +134,8 @@
 
   const LS_KEY = "yisol-office.v1";
   const TABS = ["meeting", "tasks", "team", "memos"];
+  // publishable(sb_publishable_…) 키를 정식으로 인식하는 버전으로 고정
+  const SDK_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2/dist/umd/supabase.js";
 
   /* ---------------------------------------------------------------- 상태 */
 
@@ -145,7 +147,9 @@
     recipient: "all",
     taskFilter: "all",
     taskAssignee: "all",
-    conn: "demo", // demo | connecting | live | error
+    conn: "demo", // demo | connecting | live | error | auth
+    auth: "off", // off(데모/인증 미설정) | checking | out | in
+    userEmail: "",
     stick: true,
     sending: false,
     memoTarget: null,
@@ -683,7 +687,7 @@
     if (sdkPromise) return sdkPromise;
     sdkPromise = new Promise((resolve, reject) => {
       const script = document.createElement("script");
-      script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+      script.src = SDK_URL;
       script.async = true;
       script.onload = () => {
         if (window.supabase && window.supabase.createClient) resolve(window.supabase);
@@ -705,14 +709,211 @@
     });
   }
 
-  async function connectRemote() {
-    const sdk = await loadSdk();
-    if (connectAborted) return;
+  /* ---------------------------------------------------------------- 인증 */
 
-    client = sdk.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, {
-      auth: { persistSession: false, autoRefreshToken: false }
+  function setAuthError(text) {
+    const el = $("#authError");
+    if (!el) return;
+    el.textContent = text || "";
+    el.hidden = !text;
+  }
+
+  function setAuthBusy(busy, label) {
+    const btn = $("#authSubmit");
+    if (!btn) return;
+    btn.disabled = !!busy;
+    btn.textContent = busy ? (label || "여는 중…") : "로그인";
+  }
+
+  // 로그인 화면을 띄우고 비서실을 가린다.
+  function showAuthGate(message) {
+    state.auth = "out";
+    state.conn = "auth";
+    document.body.classList.add("is-locked");
+    const gate = $("#authGate");
+    if (gate) gate.hidden = false;
+    setAuthBusy(false);
+    setAuthError(message || "");
+    renderBadge();
+    if (!message) {
+      const email = $("#authEmail");
+      if (email && !email.value) {
+        setTimeout(() => { try { email.focus(); } catch (err) {} }, 90);
+      }
+    }
+  }
+
+  function hideAuthGate() {
+    state.auth = "in";
+    document.body.classList.remove("is-locked");
+    const gate = $("#authGate");
+    if (gate) gate.hidden = true;
+    setAuthError("");
+    setAuthBusy(false);
+  }
+
+  // 비서실 위에 남는 안내(데이터 로드 실패 등). 로그인을 다시 하지 않아도 재시도할 수 있다.
+  function showAppNotice(text) {
+    const el = $("#appNotice");
+    if (!el) return;
+    el.innerHTML =
+      '<span class="notice-text">' + esc(text) + "</span>" +
+      '<button type="button" class="notice-btn" data-action="retry-load">다시 시도</button>';
+    el.hidden = false;
+  }
+
+  function clearAppNotice() {
+    const el = $("#appNotice");
+    if (!el) return;
+    el.innerHTML = "";
+    el.hidden = true;
+  }
+
+  function isAuthError(err) {
+    if (!err) return false;
+    const code = String(err.code || err.error_code || "");
+    const msg = String(err.message || err.error_description || "");
+    return (
+      err.status === 401 ||
+      code === "PGRST301" ||
+      code === "invalid_claim" ||
+      /jwt expired|invalid claim|no api key|invalid api key/i.test(msg)
+    );
+  }
+
+  function guardAuthError(err) {
+    if (client && isAuthError(err)) {
+      leaveOffice();
+      showAuthGate("로그인이 만료됐어요. 다시 열어주세요.");
+    }
+    return err;
+  }
+
+  function loginErrorMessage(err) {
+    if (!err) return "로그인하지 못했어요. 잠시 뒤 다시 시도해 주세요.";
+    const code = String(err.code || err.error_code || "");
+    const msg = String(err.message || err.error_description || "");
+    if (code === "invalid_credentials" || /invalid login credentials/i.test(msg)) {
+      return "이메일 또는 비밀번호가 맞지 않아요.";
+    }
+    if (code === "email_not_confirmed" || /email not confirmed/i.test(msg)) {
+      return "이메일 인증이 아직 안 된 계정이에요. Supabase → Authentication → Users 에서 Confirm 해주세요.";
+    }
+    if (code === "over_request_rate_limit" || code === "too_many_requests" || err.status === 429) {
+      return "시도가 너무 잦았어요. 1~2분 뒤에 다시 시도해 주세요.";
+    }
+    if (/failed to fetch|networkerror|load failed|fetch is not defined/i.test(msg) || err.name === "TypeError") {
+      return "Supabase에 닿지 못했어요. 네트워크를 확인해 주세요.";
+    }
+    if (/api key/i.test(msg)) {
+      return "config.js의 Supabase 키가 올바르지 않아요.";
+    }
+    return "로그인하지 못했어요: " + (msg || "알 수 없는 오류");
+  }
+
+  function dataErrorMessage(err) {
+    const msg = String((err && err.message) || err || "");
+    const code = String((err && err.code) || "");
+    if (code === "PGRST205" || /could not find the table|schema cache/i.test(msg)) {
+      return "비서실 테이블이 아직 없어요. Supabase SQL Editor에서 supabase-schema.sql을 실행한 뒤 다시 열어주세요.";
+    }
+    if (/permission denied|row-level security/i.test(msg)) {
+      return "이 계정에는 비서실 접근 권한이 없어요. supabase-schema.sql의 RLS 정책을 확인해 주세요.";
+    }
+    if (/failed to fetch|load failed|networkerror/i.test(msg)) {
+      return "Supabase에 닿지 못했어요. 네트워크를 확인해 주세요.";
+    }
+    return "비서실 데이터를 불러오지 못했어요: " + (msg || "알 수 없는 오류");
+  }
+
+  async function getClient() {
+    if (client) return client;
+    const sdk = await loadSdk();
+    client = sdk.createClient(CFG.SUPABASE_URL.trim(), CFG.SUPABASE_ANON_KEY.trim(), {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
     });
 
+    // 세션이 끊기면(로그아웃·만료) 비서실을 닫고 로그인 화면으로 돌아간다.
+    client.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT" && state.auth === "in") {
+        leaveOffice();
+        showAuthGate();
+      }
+    });
+
+    return client;
+  }
+
+  async function handleSignIn(event) {
+    if (event && typeof event.preventDefault === "function") event.preventDefault();
+    if (!client) return;
+
+    const emailEl = $("#authEmail");
+    const passwordEl = $("#authPassword");
+    const email = (emailEl && emailEl.value ? emailEl.value : "").trim();
+    const password = passwordEl && passwordEl.value ? passwordEl.value : "";
+
+    if (!email || !password) {
+      setAuthError("이메일과 비밀번호를 모두 적어주세요.");
+      if (!email && emailEl) emailEl.focus();
+      else if (passwordEl) passwordEl.focus();
+      return;
+    }
+
+    setAuthError("");
+    setAuthBusy(true, "여는 중…");
+
+    try {
+      const res = await withTimeout(
+        client.auth.signInWithPassword({ email: email, password: password }),
+        15000,
+        "Supabase 응답이 없어요."
+      );
+      if (res.error) throw res.error;
+      if (passwordEl) passwordEl.value = "";
+      const user = res.data && res.data.user;
+      await enterOffice(user);
+    } catch (err) {
+      setAuthError(loginErrorMessage(err));
+      setAuthBusy(false);
+      if (passwordEl) {
+        passwordEl.focus();
+        try { passwordEl.select(); } catch (e) {}
+      }
+      console.warn("[이솔 비서실] 로그인 실패:", err);
+    }
+  }
+
+  async function handleSignOut() {
+    try {
+      if (client) await client.auth.signOut();
+    } catch (err) {
+      /* 이미 세션이 없어도 그대로 잠그면 된다 */
+    }
+    leaveOffice();
+    showAuthGate();
+    toast("로그아웃했어요.");
+  }
+
+  // 비서실을 닫고 화면에 남은 데이터를 지운다(로그아웃·세션 만료).
+  function leaveOffice() {
+    if (channel && client) {
+      try { client.removeChannel(channel); } catch (err) {}
+    }
+    channel = null;
+    db.messages = [];
+    db.tasks = [];
+    db.assistants = [];
+    db.memos = [];
+    state.userEmail = "";
+    state.auth = "out";
+    state.sending = false;
+    closeModal();
+  }
+
+  /* ---------------------------------------------------------------- Supabase 연결 */
+
+  async function loadRemoteData() {
     const results = await Promise.all([
       client.from("messages").select("*").order("created_at", { ascending: true }),
       client.from("tasks").select("*").order("sort_order", { ascending: true }).order("created_at", { ascending: true }),
@@ -722,19 +923,65 @@
 
     const failed = results.find((r) => r.error);
     if (failed) throw failed.error;
-    if (connectAborted) return;
 
     db.messages = results[0].data || [];
     db.tasks = results[1].data || [];
     db.assistants = results[2].data || [];
     db.memos = results[3].data || [];
+  }
+
+  // 로그인한 세션으로 비서실을 연다.
+  async function enterOffice(user) {
+    hideAuthGate();
+    state.userEmail = (user && user.email) || state.userEmail;
+    await loadOffice();
+  }
+
+  // 테이블을 읽어 화면을 채운다. 실패하면 비서실 위에 안내를 띄우고(로그인은 유지)
+  // ‘다시 시도’ 버튼으로 재시도할 수 있게 둔다.
+  async function loadOffice() {
+    clearAppNotice();
+    state.conn = "connecting";
+    renderBadge();
+
+    try {
+      await withTimeout(loadRemoteData(), 15000, "Supabase 응답이 없어요.");
+    } catch (err) {
+      if (isAuthError(err)) {
+        leaveOffice();
+        showAuthGate(loginErrorMessage(err));
+        return;
+      }
+      state.conn = "error";
+      renderAll();
+      showAppNotice(dataErrorMessage(err));
+      console.warn("[이솔 비서실] 데이터 불러오기 실패:", err);
+      return;
+    }
 
     if (!db.assistants.length) await seedAssistantsRemote();
-    if (connectAborted) return;
 
     state.conn = "live";
-    renderBadge();
+    renderAll();
     subscribeRealtime();
+    toast("비서실을 열었어요 · 실시간 동기화 중");
+  }
+
+  // 앱 시작: SDK → 저장된 세션 확인 → 있으면 바로 열고, 없으면 로그인 화면.
+  async function bootstrapRemote() {
+    await getClient();
+    if (connectAborted) return;
+
+    const res = await client.auth.getSession();
+    const session = res && res.data && res.data.session;
+    if (connectAborted) return;
+
+    if (!session) {
+      showAuthGate();
+      return;
+    }
+
+    await enterOffice(session.user);
   }
 
   async function seedAssistantsRemote() {
@@ -771,6 +1018,7 @@
       .on("postgres_changes", { event: "*", schema: "public", table: "assistants" }, (p) => onRealtime("assistants", p))
       .on("postgres_changes", { event: "*", schema: "public", table: "memos" }, (p) => onRealtime("memos", p))
       .subscribe((status) => {
+        if (state.auth !== "in") return;
         if (status === "SUBSCRIBED") {
           state.conn = "live";
         } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
@@ -816,7 +1064,7 @@
   async function apiInsert(table, row) {
     if (client) {
       const res = await client.from(table).insert(row).select().single();
-      if (res.error) throw res.error;
+      if (res.error) throw guardAuthError(res.error);
       return res.data;
     }
     const saved = Object.assign({}, row);
@@ -831,7 +1079,7 @@
   async function apiUpdate(table, id, patch) {
     if (client) {
       const res = await client.from(table).update(patch).eq("id", id).select().single();
-      if (res.error) throw res.error;
+      if (res.error) throw guardAuthError(res.error);
       return res.data;
     }
     const row = db[table].find((item) => item.id === id);
@@ -844,7 +1092,7 @@
   async function apiDelete(table, id) {
     if (client) {
       const res = await client.from(table).delete().eq("id", id);
-      if (res.error) throw res.error;
+      if (res.error) throw guardAuthError(res.error);
       return true;
     }
     db[table] = db[table].filter((item) => item.id !== id);
@@ -857,8 +1105,10 @@
   function renderBadge() {
     const badge = $("#connBadge");
     const text = $("#connText");
+    const signOutBtn = $("#signoutBtn");
+    if (signOutBtn) signOutBtn.hidden = state.auth !== "in";
     if (!badge || !text) return;
-    badge.classList.remove("is-live", "is-demo", "is-connecting", "is-error");
+    badge.classList.remove("is-live", "is-demo", "is-connecting", "is-error", "is-auth");
 
     let cls = "is-demo";
     let label = "로컬 데모";
@@ -872,10 +1122,14 @@
       cls = "is-connecting";
       label = "연결 중…";
       tip = "Supabase에 연결하는 중입니다.";
+    } else if (state.conn === "auth") {
+      cls = "is-auth";
+      label = "로그인 필요";
+      tip = "이메일과 비밀번호로 로그인하면 비서실이 열립니다.";
     } else if (state.conn === "error") {
       cls = "is-error";
       label = "연결 끊김";
-      tip = "Supabase 연결에 실패해 로컬 데이터로 보여주고 있어요. config.js의 URL·키를 확인해 주세요.";
+      tip = "Supabase 연결에 실패했어요. config.js의 URL·키와 프로젝트 상태를 확인해 주세요.";
     }
 
     badge.classList.add(cls);
@@ -1445,6 +1699,12 @@
   function bindEvents() {
     document.addEventListener("click", onClick);
 
+    const authForm = $("#authForm");
+    if (authForm) authForm.addEventListener("submit", handleSignIn);
+
+    const signOutBtn = $("#signoutBtn");
+    if (signOutBtn) signOutBtn.addEventListener("click", handleSignOut);
+
     const composer = $("#composer");
     if (composer) {
       composer.addEventListener("submit", (e) => {
@@ -1537,6 +1797,11 @@
 
     if (action === "close-modal") {
       closeModal();
+      return;
+    }
+
+    if (action === "retry-load") {
+      await loadOffice();
       return;
     }
 
@@ -1677,30 +1942,32 @@
     bindEvents();
     bindChange();
 
-    // 화면은 로컬 데이터로 먼저 그린다. (연결이 늦거나 실패해도 빈 화면이 되지 않도록)
-    useLocalData();
-    state.ready = true;
-
+    // Supabase를 안 쓰는 로컬 데모 모드: 로그인 없이 바로 연다.
     if (!hasRemote) {
+      useLocalData();
+      state.ready = true;
       state.conn = "demo";
+      state.auth = "off";
       renderAll();
       return;
     }
 
+    // Supabase 모드: 로그인 전에는 비서실을 가리고(로컬 샘플 데이터도 보이지 않게)
+    // 로그인 화면만 보여준다.
     state.conn = "connecting";
+    state.auth = "checking";
+    document.body.classList.add("is-locked");
+    const gate = $("#authGate");
+    if (gate) gate.hidden = false;
+    setAuthBusy(true, "연결 확인 중…");
     renderAll();
 
     try {
-      await withTimeout(connectRemote(), 10000, "Supabase 응답이 없어요.");
-      if (connectAborted) return;
-      renderAll();
-      toast("Supabase에 연결됐어요 · 실시간 동기화 중");
+      await withTimeout(bootstrapRemote(), 15000, "Supabase 응답이 없어요.");
     } catch (err) {
       connectAborted = true;
-      client = null;
       state.conn = "error";
-      renderAll();
-      toast("Supabase 연결 실패 — 로컬 데이터로 열었어요.");
+      showAuthGate(loginErrorMessage(err));
       console.warn("[이솔 비서실] Supabase 연결 실패:", err);
     }
   }

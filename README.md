@@ -40,17 +40,32 @@ python3 build-standalone.py   # index.html + styles.css + config.js + app.js →
 
 ---
 
-## 2. Supabase 연결 (실시간 동기화)
+## 2. Supabase 연결 (로그인 + 실시간 동기화)
 
-1. <https://supabase.com> 에서 새 프로젝트를 만듭니다. (무료 플랜으로 충분)
-2. 프로젝트 → **SQL Editor** → `supabase-schema.sql` 전체를 붙여넣고 **Run**.
-   - `assistants` · `messages` · `tasks` · `memos` 4개 테이블이 생기고
-   - RLS 공개 정책, Realtime 발행, 비서 6명 시드가 함께 적용됩니다.
-3. 프로젝트 → **Settings → API** 에서 두 값을 복사합니다.
-   - `Project URL` → `config.js`의 `SUPABASE_URL`
-   - `anon public` 키 → `config.js`의 `SUPABASE_ANON_KEY`
-4. `config.js` 저장 후 새로고침.
-   - 상단 배지가 초록색 **실시간 연결**로 바뀌면 정상입니다.
+> 이 프로젝트(`yzeovdjceqjundyyyfwo`)는 이미 `config.js`에 연결되어 있습니다.
+> 새 프로젝트를 쓰려면 아래 3번에서 URL·키만 바꾸면 됩니다.
+
+### 한 번만 하면 되는 3단계
+
+1. 프로젝트 → **SQL Editor** → `supabase-schema.sql` 전체를 붙여넣고 **Run**.
+   - `assistants` · `messages` · `tasks` · `memos` 4개 테이블
+   - **로그인 전용 RLS**(`auth.role() = 'authenticated'`) — 비로그인은 읽기·쓰기 모두 불가
+   - Realtime 발행, 비서 6명 시드
+2. 프로젝트 → **Authentication → Users → Add user**
+   - 본인 이메일 + 비밀번호로 **계정 1개**만 만듭니다.
+   - **Auto Confirm User** 를 체크해야 메일 인증 없이 바로 로그인됩니다.
+3. (권장) **Authentication → Sign In / Providers → Email** 에서
+   **Allow new users to sign up** 을 끕니다.
+   - 정책이 `authenticated` 기준이라, 회원가입이 열려 있으면 남이 자기 계정을 만들어 들어올 수 있습니다.
+   - 이 앱은 **한 사람 전용**이므로 가입은 닫아 두세요.
+4. 사이트를 열면 **이솔 비서실 로그인 화면**이 뜹니다. 2번에서 만든 이메일·비밀번호로 로그인.
+   - 로그인 상태는 그 기기에 저장되어, 다음부터는 바로 열립니다.
+   - 헤더 오른쪽 **나가기** 로 로그아웃할 수 있습니다.
+
+### 키에 대해
+
+`config.js`에 들어가는 것은 **publishable(anon) 키**로, 공개되어도 되는 키입니다.
+데이터를 지키는 것은 키가 아니라 **RLS 정책**입니다. (절대 `service_role`/secret 키를 넣지 마세요.)
 
 ```js
 // config.js
@@ -58,10 +73,12 @@ window.APP_CONFIG = {
   APP_TITLE: "이솔 비서실",
   OWNER_NAME: "이솔",
   OWNER_LABEL: "이솔님 전용",
-  SUPABASE_URL: "https://xxxxxxxxxxxx.supabase.co",
-  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6..."
+  SUPABASE_URL: "https://yzeovdjceqjundyyyfwo.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_..."
 };
 ```
+
+값을 비우면 로그인 화면 없이 **로컬 데모 모드**로 동작합니다.
 
 ### 동기화되는 것
 
@@ -163,12 +180,16 @@ yisol-office/
 
 ## 7. 보안·주의
 
-- 이 앱은 **한 사람의 비서실**을 전제로 `anon` 키에 읽기/쓰기를 열어둡니다.
-  URL과 키를 아는 사람은 데이터를 볼 수 있으니, 공개 저장소에 실제 키를 커밋하지 마세요.
-  (Vercel 환경변수 + 빌드 시 주입, 또는 비공개 저장소 권장)
+- **로그인 필수**: 모든 테이블에 RLS가 켜져 있고 정책은 `auth.role() = 'authenticated'`입니다.
+  로그인하지 않은 상태(anon)에서는 읽기도 쓰기도 막힙니다. anon 권한은 회수해 두었습니다.
+- 프론트에 들어가는 키는 **publishable(anon) 키** — 공개되어도 되는 키입니다.
+  **`service_role`/secret 키는 절대 넣지 마세요.** 그 키는 RLS를 우회합니다.
+- **회원가입은 닫아 두세요** (Authentication → Sign In / Providers → Email).
+  열려 있으면 누구나 계정을 만들어 로그인할 수 있습니다.
+- 비밀번호를 잊으면: Supabase → Authentication → Users → 해당 계정 → **Reset password**
+  (또는 새 비밀번호로 계정을 다시 만들고 기존 계정을 지움).
 - 저장되는 내용은 평문입니다. 건강·금융 등 민감한 내용은 메모에 그대로 적지 않는 편이 안전합니다.
-- 로그인이 필요한 다중 사용자용으로 쓰려면 Supabase Auth를 붙이고 RLS 정책을
-  `auth.uid()` 기준으로 바꿔야 합니다. 지금 정책은 '비공개 개인용' 전제입니다.
+- 기기를 잃어버렸을 때는 Supabase → Authentication → Users 에서 **Sign out all sessions** 를 누르는 것이 가장 확실합니다.
 
 ---
 
@@ -176,8 +197,11 @@ yisol-office/
 
 | 증상 | 확인할 것 |
 | --- | --- |
+| 로그인 화면이 계속 뜸 | Supabase → Authentication → Users 에 계정이 있는지, Auto Confirm 상태인지 |
+| “이메일 또는 비밀번호가 맞지 않아요” | 오타 확인 · Users에서 **Reset password** |
+| “비서실 테이블이 아직 없어요” | SQL Editor에서 `supabase-schema.sql`을 실행했는지 |
 | 배지가 계속 `로컬 데모` | `config.js`의 두 값이 비어 있거나 20자 미만인지 |
-| `연결 끊김` | Supabase 프로젝트 일시정지, URL/anon 키 오타, 스키마 미실행 |
+| `연결 끊김` | Supabase 프로젝트 일시정지, URL·키 오타 |
 | 새 메시지가 다른 기기에 안 뜸 | Database → Replication 의 `supabase_realtime` 발행 테이블 확인 |
 | 화면이 비어 보임 | 브라우저 콘솔 오류 확인, `index.html`과 같은 폴더에 `app.js`·`styles.css`가 있는지 |
 | 폰에서 입력창이 가려짐 | iOS 안전영역(`env(safe-area-inset-bottom)`)이 적용돼 있습니다. Safari 새로고침 후 재확인 |

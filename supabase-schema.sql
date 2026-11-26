@@ -1,7 +1,20 @@
 -- ============================================================================
--- 이솔 비서실 — Supabase 스키마
--- 사용법: Supabase 대시보드 → SQL Editor → 아래 전체를 붙여넣고 Run
---        (여러 번 실행해도 안전하도록 작성했습니다)
+-- 이솔 비서실 — Supabase 스키마 (로그인 필수 · RLS 잠금)
+--
+-- 사용법
+--   1) Supabase 대시보드 → SQL Editor → 아래 전체를 붙여넣고 Run
+--      (여러 번 실행해도 안전하도록 작성했습니다)
+--   2) Authentication → Users → Add user 에서 본인 이메일 + 비밀번호로 계정 1개 만들기
+--      ("Auto Confirm User" 체크 — 메일 인증 없이 바로 로그인됩니다)
+--   3) (권장) Authentication → Sign In / Providers → Email 에서
+--      "Allow new users to sign up" 을 끄기 — 이 앱은 한 사람 전용이라
+--      새 계정이 열려 있으면 안 됩니다.
+--
+-- 보안
+--   · 모든 테이블에 RLS가 켜지고, 정책은 '로그인한 사용자(authenticated)' 전용입니다.
+--   · 로그인하지 않은 상태에서는 읽기·쓰기가 모두 막힙니다.
+--   · 프론트엔드에 들어가는 키는 공개되어도 되는 publishable(anon) 키입니다.
+--     데이터를 지켜주는 것은 이 RLS 정책이지 키가 아닙니다.
 -- ============================================================================
 
 create extension if not exists "pgcrypto";
@@ -81,10 +94,9 @@ begin
 end;
 $$;
 
+-- messages 에는 updated_at 컬럼이 없다 → 트리거를 걸지 않는다(걸면 UPDATE 시 오류).
+
 drop trigger if exists touch_messages_updated_at on public.messages;
-create trigger touch_messages_updated_at
-  before update on public.messages
-  for each row execute function public.touch_updated_at();
 
 drop trigger if exists touch_tasks_updated_at on public.tasks;
 create trigger touch_tasks_updated_at
@@ -102,52 +114,57 @@ create trigger touch_assistants_updated_at
   for each row execute function public.touch_updated_at();
 
 -- ---------------------------------------------------------------------------
--- RLS + 공개 정책
---   · 이 앱은 '이솔님 한 사람의 비서실'을 전제로 anon 키에 읽기/쓰기를 엽니다.
---   · URL과 anon 키를 아는 사람은 같은 데이터를 볼 수 있으니,
---     저장소를 공개(public)로 둘 때는 키를 그대로 올리지 말고
---     Vercel 환경변수·비공개 저장소 등으로 관리하세요.
+-- RLS + 로그인 전용(authenticated) 정책
+--   · 정책 조건은 auth.role() = 'authenticated' — 로그인한 계정만 통과합니다.
+--   · 예전 버전의 '공개(true)' 정책이 남아 있어도 아래 drop → create 로 덮어씁니다.
+--   · anon(비로그인) 권한은 회수해서, 실수로 정책이 풀려도 테이블이 열리지 않게 했습니다.
 -- ---------------------------------------------------------------------------
 alter table public.assistants enable row level security;
 alter table public.messages   enable row level security;
 alter table public.tasks      enable row level security;
 alter table public.memos      enable row level security;
 
+-- 비로그인(anon) 권한 회수 — RLS가 뚫려도 테이블 자체에 접근할 수 없게 한다.
+revoke all on table public.assistants, public.messages, public.tasks, public.memos from anon;
+
+-- 로그인한 사용자에게는 4개 테이블 읽기/쓰기 허용 (RLS 정책이 실제 조건을 판단)
+grant select, insert, update, delete on table public.assistants, public.messages, public.tasks, public.memos to authenticated;
+
 drop policy if exists "assistants read"   on public.assistants;
 drop policy if exists "assistants write"  on public.assistants;
 drop policy if exists "assistants update" on public.assistants;
 drop policy if exists "assistants delete" on public.assistants;
-create policy "assistants read"   on public.assistants for select using (true);
-create policy "assistants write"  on public.assistants for insert with check (true);
-create policy "assistants update" on public.assistants for update using (true) with check (true);
-create policy "assistants delete" on public.assistants for delete using (true);
+create policy "assistants read"   on public.assistants for select to authenticated using (auth.role() = 'authenticated');
+create policy "assistants write"  on public.assistants for insert to authenticated with check (auth.role() = 'authenticated');
+create policy "assistants update" on public.assistants for update to authenticated using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "assistants delete" on public.assistants for delete to authenticated using (auth.role() = 'authenticated');
 
 drop policy if exists "messages read"   on public.messages;
 drop policy if exists "messages write"  on public.messages;
 drop policy if exists "messages update" on public.messages;
 drop policy if exists "messages delete" on public.messages;
-create policy "messages read"   on public.messages for select using (true);
-create policy "messages write"  on public.messages for insert with check (true);
-create policy "messages update" on public.messages for update using (true) with check (true);
-create policy "messages delete" on public.messages for delete using (true);
+create policy "messages read"   on public.messages for select to authenticated using (auth.role() = 'authenticated');
+create policy "messages write"  on public.messages for insert to authenticated with check (auth.role() = 'authenticated');
+create policy "messages update" on public.messages for update to authenticated using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "messages delete" on public.messages for delete to authenticated using (auth.role() = 'authenticated');
 
 drop policy if exists "tasks read"   on public.tasks;
 drop policy if exists "tasks write"  on public.tasks;
 drop policy if exists "tasks update" on public.tasks;
 drop policy if exists "tasks delete" on public.tasks;
-create policy "tasks read"   on public.tasks for select using (true);
-create policy "tasks write"  on public.tasks for insert with check (true);
-create policy "tasks update" on public.tasks for update using (true) with check (true);
-create policy "tasks delete" on public.tasks for delete using (true);
+create policy "tasks read"   on public.tasks for select to authenticated using (auth.role() = 'authenticated');
+create policy "tasks write"  on public.tasks for insert to authenticated with check (auth.role() = 'authenticated');
+create policy "tasks update" on public.tasks for update to authenticated using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "tasks delete" on public.tasks for delete to authenticated using (auth.role() = 'authenticated');
 
 drop policy if exists "memos read"   on public.memos;
 drop policy if exists "memos write"  on public.memos;
 drop policy if exists "memos update" on public.memos;
 drop policy if exists "memos delete" on public.memos;
-create policy "memos read"   on public.memos for select using (true);
-create policy "memos write"  on public.memos for insert with check (true);
-create policy "memos update" on public.memos for update using (true) with check (true);
-create policy "memos delete" on public.memos for delete using (true);
+create policy "memos read"   on public.memos for select to authenticated using (auth.role() = 'authenticated');
+create policy "memos write"  on public.memos for insert to authenticated with check (auth.role() = 'authenticated');
+create policy "memos update" on public.memos for update to authenticated using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "memos delete" on public.memos for delete to authenticated using (auth.role() = 'authenticated');
 
 -- ---------------------------------------------------------------------------
 -- Realtime 활성화 (4개 테이블)

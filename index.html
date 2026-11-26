@@ -11,7 +11,7 @@
 <meta name="description" content="이솔님 전용 비서실 — 미우·클로드·뮤즈·키링·챗지피티·인스팅트가 모이는 회의실, 작업실, 비서현황, 메모." />
 <title>이솔 비서실</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%23F6E9CE'/%3E%3Ctext x='50' y='72' font-size='58' text-anchor='middle'%3E%F0%9F%91%91%3C/text%3E%3C/svg%3E" />
-<link rel="stylesheet" href="styles.css?v=20261126-8" />
+<link rel="stylesheet" href="styles.css?v=20261126-9" />
 </head>
 <body>
 <div class="stage">
@@ -29,10 +29,15 @@
           <p class="brand-sub"><span class="brand-dot" aria-hidden="true"></span><span id="ownerLabel">이솔님 전용</span></p>
         </div>
       </div>
-      <button class="conn-badge is-demo" id="connBadge" type="button" aria-live="polite">
-        <span class="conn-dot" aria-hidden="true"></span><span id="connText">로컬 데모</span>
-      </button>
+      <div class="header-actions">
+        <button class="conn-badge is-demo" id="connBadge" type="button" aria-live="polite">
+          <span class="conn-dot" aria-hidden="true"></span><span id="connText">로컬 데모</span>
+        </button>
+        <button class="signout-btn" id="signoutBtn" type="button" title="로그아웃" hidden>나가기</button>
+      </div>
     </header>
+
+    <div class="app-notice" id="appNotice" hidden></div>
 
     <nav class="tabs" id="tabs" role="tablist" aria-label="비서실 메뉴">
       <button class="tab is-active" type="button" role="tab" data-tab="meeting" aria-selected="true" aria-controls="view-meeting">
@@ -150,10 +155,43 @@
   </div>
 </div>
 
+<!-- 로그인 게이트 — Supabase 인증이 켜져 있으면 비서실 앞을 막는 화면 -->
+<div class="auth-gate" id="authGate" hidden>
+  <div class="auth-card" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <div class="auth-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M3.6 8.4l3.5 2.7L12 4.8l4.9 6.3 3.5-2.7-1.5 8.4c-.1.6-.7 1.1-1.3 1.1H6.4c-.6 0-1.2-.5-1.3-1.1L3.6 8.4z" fill="currentColor"/>
+        <path d="M7.2 21h9.6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <p class="auth-eyebrow">YISOL OFFICE</p>
+    <h1 class="auth-title" id="authTitle">이솔 비서실</h1>
+    <p class="auth-sub">여섯 비서가 기다리고 있어요.<br>비밀번호로 문을 열어주세요.</p>
+
+    <form class="auth-form" id="authForm" autocomplete="on">
+      <label class="auth-field">
+        <span>이메일</span>
+        <input id="authEmail" name="email" type="email" inputmode="email" autocomplete="username"
+               autocapitalize="off" spellcheck="false" placeholder="이메일 주소" required />
+      </label>
+      <label class="auth-field">
+        <span>비밀번호</span>
+        <input id="authPassword" name="password" type="password" autocomplete="current-password"
+               placeholder="비밀번호" required />
+      </label>
+      <p class="auth-error" id="authError" role="alert" hidden></p>
+      <button class="auth-submit" id="authSubmit" type="submit">로그인</button>
+    </form>
+
+    <p class="auth-hint">처음이라면 Supabase 대시보드 <b>Authentication → Users → Add user</b>에서<br>계정을 하나 만든 뒤 로그인하세요.</p>
+    <p class="auth-note"><span class="lock-dot" aria-hidden="true"></span>로그인 정보는 이 기기에만, 기록은 Supabase에만 남습니다.</p>
+  </div>
+</div>
+
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div id="modalRoot"></div>
 
-<script src="config.js?v=20261126-8"></script>
-<script src="app.js?v=20261126-8"></script>
+<script src="config.js?v=20261126-9"></script>
+<script src="app.js?v=20261126-9"></script>
 </body>
 </html>

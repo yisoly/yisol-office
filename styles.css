@@ -166,6 +166,22 @@ a { color: var(--brown); }
   box-shadow: 0 0 0 3px rgba(127, 191, 138, .16);
 }
 
+.header-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+
+.signout-btn {
+  flex: none;
+  padding: 7px 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-2);
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  transition: background .2s ease, color .2s ease, border-color .2s ease;
+}
+.signout-btn:hover { background: var(--brown-050); border-color: var(--brown-100); color: var(--brown-700); }
+.signout-btn[hidden] { display: none; }
+
 .conn-badge {
   flex: none;
   display: inline-flex; align-items: center; gap: 7px;
@@ -200,6 +216,11 @@ a { color: var(--brown); }
   background: var(--red-bg);
   border-color: var(--red-line);
   color: var(--red);
+}
+.conn-badge.is-auth {
+  background: var(--brown-050);
+  border-color: var(--brown-100);
+  color: var(--brown-500);
 }
 
 @keyframes pulse {
@@ -1316,3 +1337,200 @@ a { color: var(--brown); }
     scroll-behavior: auto !important;
   }
 }
+
+/* ==========================================================================
+   로그인 게이트 — Supabase 인증이 켜져 있을 때만 보입니다.
+   ========================================================================== */
+
+body.is-locked .stage { display: none; }
+
+.auth-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background:
+    radial-gradient(900px 520px at 12% -10%, #FFF6E6 0%, rgba(255, 246, 230, 0) 62%),
+    radial-gradient(760px 460px at 92% 6%, #FBEEDC 0%, rgba(251, 238, 220, 0) 60%),
+    linear-gradient(160deg, #FAF7F0 0%, #F6F1E7 52%, #F2EBDD 100%);
+}
+.auth-gate[hidden] { display: none; }
+
+.auth-card {
+  width: 100%;
+  max-width: 384px;
+  margin: auto;
+  padding: 30px 26px 22px;
+  text-align: center;
+  background: linear-gradient(180deg, var(--card) 0%, var(--card-2) 100%);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow);
+  animation: auth-in .28s ease-out both;
+}
+
+@keyframes auth-in {
+  from { opacity: 0; transform: translateY(8px) scale(.99); }
+  to { opacity: 1; transform: none; }
+}
+
+.auth-mark {
+  width: 56px; height: 56px;
+  margin: 0 auto 14px;
+  display: grid; place-items: center;
+  color: var(--brown);
+  background: linear-gradient(150deg, #FFF7E7 0%, #FBEACD 100%);
+  border: 1px solid #EBD4A9;
+  border-radius: 18px;
+  box-shadow: inset 0 1px 0 #FFFDF7, 0 2px 6px rgba(123, 75, 36, .08);
+}
+.auth-mark svg { width: 26px; height: 26px; }
+
+.auth-eyebrow {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .17em;
+  color: var(--brown-300);
+}
+.auth-title {
+  margin-top: 5px;
+  font-size: 23px;
+  font-weight: 800;
+  letter-spacing: -.02em;
+  color: var(--text);
+}
+.auth-sub {
+  margin-top: 9px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-2);
+}
+
+.auth-form { margin-top: 20px; text-align: left; }
+
+.auth-field { display: block; margin-bottom: 12px; }
+.auth-field > span {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  color: var(--text-2);
+}
+.auth-field input {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 16px;               /* iOS 자동 확대 방지 */
+  color: var(--text);
+  background: #FFFDF8;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  caret-color: var(--brown);
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+.auth-field input::placeholder { color: #B7A893; }
+.auth-field input:focus {
+  outline: none;
+  border-color: var(--brown-300);
+  box-shadow: 0 0 0 3px rgba(201, 168, 131, .22);
+}
+
+.auth-error {
+  margin: 2px 0 10px;
+  padding: 9px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--red);
+  text-align: left;
+  background: var(--red-bg);
+  border: 1px solid var(--red-line);
+  border-radius: var(--r-sm);
+}
+.auth-error[hidden] { display: none; }
+
+.auth-submit {
+  width: 100%;
+  margin-top: 4px;
+  padding: 13px 16px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -.01em;
+  color: #FFF9EF;
+  background: linear-gradient(170deg, #8A5527 0%, #6B3F1C 100%);
+  border: 1px solid #5F3A1A;
+  border-radius: 14px;
+  box-shadow: 0 6px 16px rgba(123, 75, 36, .18);
+  transition: filter .18s ease, opacity .18s ease;
+}
+.auth-submit:hover { filter: brightness(1.05); }
+.auth-submit:active { transform: translateY(1px); }
+.auth-submit:disabled { opacity: .62; cursor: default; filter: none; }
+
+.auth-hint {
+  margin-top: 16px;
+  font-size: 11.5px;
+  line-height: 1.65;
+  color: var(--muted);
+}
+.auth-hint b { color: var(--text-2); font-weight: 700; }
+
+.auth-note {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  margin-top: 14px;
+  padding-top: 13px;
+  font-size: 11.5px;
+  color: var(--muted);
+  border-top: 1px dashed var(--line);
+}
+.auth-note .lock-dot {
+  width: 6px; height: 6px; flex: none; border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 3px rgba(47, 158, 68, .14);
+}
+
+@media (max-width: 700px) {
+  .app-notice { margin: 8px 16px 0; }
+}
+
+@media (max-width: 420px) {
+  .auth-gate { padding: 18px 16px; align-items: start; }
+  .auth-card { padding: 26px 20px 20px; margin-top: 12px; }
+  .auth-title { font-size: 21px; }
+}
+
+/* ---------- 비서실 상단 안내(데이터 로드 실패 등) ---------- */
+
+.app-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: none;
+  flex-wrap: wrap;
+  margin: 10px 22px 0;
+  padding: 10px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--red);
+  background: var(--red-bg);
+  border: 1px solid var(--red-line);
+  border-radius: var(--r-sm);
+}
+.app-notice[hidden] { display: none; }
+.notice-btn {
+  flex: none;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--red);
+  background: #FFFDF9;
+  border: 1px solid var(--red-line);
+  border-radius: 999px;
+}
+.notice-btn:hover { background: #FBEBEB; }

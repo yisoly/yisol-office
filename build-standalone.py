@@ -4,8 +4,13 @@
 
    python3 build-standalone.py
    → dist/이솔-비서실-데모.html
+
+   · index.html 의 ?v=... 캐시 버전이 붙어 있어도 정규식으로 찾아 바꾼다.
+   · 데모 파일에는 Supabase 주소·키를 비워 넣어 로컬 데모 모드로 열린다
+     (로그인 화면 없이 파일 하나로 바로 열 수 있게).
 """
 import pathlib
+import re
 
 ROOT = pathlib.Path(__file__).resolve().parent
 OUT = ROOT / "dist" / "이솔-비서실-데모.html"
@@ -15,14 +20,32 @@ css = (ROOT / "styles.css").read_text(encoding="utf-8")
 config = (ROOT / "config.js").read_text(encoding="utf-8")
 app = (ROOT / "app.js").read_text(encoding="utf-8")
 
-html = html.replace(
-    '<link rel="stylesheet" href="styles.css" />',
-    "<style>\n" + css + "\n</style>",
+# 데모 파일은 오프라인 로컬 모드로: Supabase 값을 비운다.
+config = re.sub(r'(SUPABASE_URL:\s*)"[^"]*"', r'\1""', config)
+config = re.sub(r'(SUPABASE_ANON_KEY:\s*)"[^"]*"', r'\1""', config)
+
+html, n_link = re.subn(
+    r'<link rel="stylesheet" href="styles\.css(\?[^"]*)?"\s*/?>',
+    lambda _m: "<style>\n" + css + "</style>",
+    html,
+    count=1,
 )
-html = html.replace(
-    '<script src="config.js"></script>\n<script src="app.js"></script>',
-    "<script>\n" + config + "\n</script>\n<script>\n" + app + "\n</script>",
+html, n_cfg = re.subn(
+    r'<script src="config\.js(\?[^"]*)?"></script>',
+    lambda _m: "<script>\n" + config + "\n</script>",
+    html,
+    count=1,
 )
+html, n_app = re.subn(
+    r'<script src="app\.js(\?[^"]*)?"></script>',
+    lambda _m: "<script>\n" + app + "\n</script>",
+    html,
+    count=1,
+)
+
+missing = [name for name, n in (("styles.css", n_link), ("config.js", n_cfg), ("app.js", n_app)) if n != 1]
+if missing:
+    raise SystemExit("인라인하지 못한 파일: " + ", ".join(missing) + " — index.html의 태그를 확인하세요.")
 
 OUT.parent.mkdir(parents=True, exist_ok=True)
 OUT.write_text(html, encoding="utf-8")
