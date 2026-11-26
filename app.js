@@ -154,6 +154,7 @@
     sending: false,
     memoTarget: null,
     taskTarget: null,
+    guideSender: "claude",
     ready: false
   };
 
@@ -1575,11 +1576,333 @@
     }
   }
 
+  /* ---------------------------------------------------------------- 답 옮기기 */
+
+  const RELAY_KEY_LS = "yisol-office.relay.key";
+  const RELAY_URL_LS = "yisol-office.relay.url";
+
+  function readStore(key) {
+    try { return localStorage.getItem(key) || ""; } catch (err) { return ""; }
+  }
+
+  function writeStore(key, value) {
+    try {
+      if (value) localStorage.setItem(key, value);
+      else localStorage.removeItem(key);
+    } catch (err) {
+      /* 저장이 막혀 있어도 이번 화면에서는 그대로 쓴다 */
+    }
+  }
+
+  // 기본 연결 창구 주소 = Supabase 프로젝트 주소 + /functions/v1/office-relay
+  function defaultRelayEndpoint() {
+    const base = String(CFG.SUPABASE_URL || "").trim().replace(/\/+$/, "");
+    return base ? base + "/functions/v1/office-relay" : "";
+  }
+
+  function relayEndpoint() {
+    return readStore(RELAY_URL_LS) || defaultRelayEndpoint();
+  }
+
+  function relayKey() {
+    return readStore(RELAY_KEY_LS);
+  }
+
+  function relayUrl(params) {
+    const base = relayEndpoint();
+    if (!base) return "";
+    const parts = [];
+    const key = relayKey();
+    if (key) parts.push("key=" + encodeURIComponent(key));
+    Object.keys(params || {}).forEach((name) => {
+      parts.push(name + "=" + encodeURIComponent(params[name]));
+    });
+    return base + (parts.length ? "?" + parts.join("&") : "");
+  }
+
+  function relayReadUrl() {
+    return relayUrl({ action: "read", room: "boardroom", limit: 15 });
+  }
+
+  function sortedAssistants() {
+    return db.assistants.slice().sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+  }
+
+  async function copyText(text) {
+    const value = String(text || "");
+    if (!value) return false;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(value);
+        return true;
+      }
+    } catch (err) {
+      /* 클립보드 권한이 없으면 아래 폴백으로 */
+    }
+    try {
+      const area = document.createElement("textarea");
+      area.value = value;
+      area.setAttribute("readonly", "");
+      area.style.position = "fixed";
+      area.style.top = "0";
+      area.style.left = "0";
+      area.style.opacity = "0";
+      document.body.appendChild(area);
+      area.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(area);
+      return ok;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  /* 다른 비서 앱에서 받은 답을 그 비서의 말풍선으로 회의실에 옮긴다. */
+  function openReplyModal() {
+    const assistants = sortedAssistants();
+    if (!assistants.length) {
+      toast("비서 목록을 아직 불러오지 못했어요. 잠시 뒤 다시 해보세요.");
+      return;
+    }
+
+    const picked = assistants.some((a) => a.id === state.recipient) ? state.recipient : assistants[0].id;
+    const chips = assistants
+      .map((a) => {
+        const on = a.id === picked;
+        return (
+          '<button type="button" class="pick' + (on ? " is-active" : "") + '" data-reply-sender="' + esc(a.id) +
+          '" aria-pressed="' + on + '">' + chipAvatar(a) + esc(a.name) + "</button>"
+        );
+      })
+      .join("");
+    const roomOptions = ROOMS.map(
+      (r) => '<option value="' + r.id + '"' + (r.id === state.room ? " selected" : "") + ">" + r.icon + " " + esc(r.name) + "</option>"
+    ).join("");
+
+    openModal(
+      "<h3>⇄ 답 옮기기</h3>" +
+        '<p class="modal-sub">다른 비서 앱에서 받은 답을 그 비서의 이름·얼굴 그대로 회의실에 올려요.</p>' +
+        '<form id="replyForm">' +
+        '<span class="field-label">보낸 비서</span>' +
+        '<div class="assistant-pick" id="replySenders" role="group" aria-label="보낸 비서">' + chips + "</div>" +
+        '<label class="field"><span>회의실</span><select name="room">' + roomOptions + "</select></label>" +
+        '<label class="field"><span>답글 본문</span><textarea name="body" rows="6" maxlength="8000" required ' +
+        'placeholder="비서 앱에서 답을 복사해 그대로 붙여넣으세요"></textarea></label>' +
+        '<p class="guide-note">받는 비서는 ‘전체’로 올라가고, 올린 방으로 화면이 옮겨가요.</p>' +
+        '<div class="modal-actions"><button type="button" class="btn-ghost" data-action="close-modal">취소</button>' +
+        '<button type="submit" class="btn-primary">회의실에 올리기</button></div>' +
+        "</form>",
+      "is-rose"
+    );
+
+    const form = $("#replyForm");
+    if (!form) return;
+    const area = form.querySelector('[name="body"]');
+    if (area) setTimeout(() => { try { area.focus(); } catch (err) {} }, 80);
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const active = form.querySelector(".pick.is-active");
+      const senderId = active ? active.dataset.replySender : assistants[0].id;
+      const roomEl = form.querySelector('[name="room"]');
+      const room = roomEl ? roomEl.value : state.room;
+      const body = area ? area.value.trim() : "";
+      if (!body) {
+        toast("답글 본문을 붙여넣어 주세요.");
+        if (area) area.focus();
+        return;
+      }
+
+      const row = {
+        room: room,
+        sender_id: senderId,
+        sender_name: assistantName(senderId),
+        role: "assistant",
+        kind: "text",
+        body: body,
+        recipient: "all"
+      };
+      if (!client) {
+        row.id = uid("msg");
+        row.created_at = nowIso();
+      }
+
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) submitBtn.disabled = true;
+      try {
+        const saved = await apiInsert("messages", row);
+        applyRow("messages", saved);
+        closeModal();
+        if (state.room !== room) setRoom(room);
+        else {
+          state.stick = true;
+          renderChat();
+        }
+        toast(assistantName(senderId) + " 답을 " + roomById(room).name + "에 올렸어요.");
+      } catch (err) {
+        if (submitBtn) submitBtn.disabled = false;
+        toast("올리지 못했어요: " + (err.message || err));
+      }
+    });
+  }
+
+  /* ---------------------------------------------------------------- 비서 연결 안내 */
+
+  function buildRelaySnippet(id, name) {
+    const base = relayEndpoint();
+    if (!base) {
+      return "[이솔 비서실 · " + name + " 연결]\n연결 창구 주소가 아직 없어요. 비서실 화면에서 주소를 한 번 넣어주세요.";
+    }
+
+    const key = relayKey();
+    const read = relayReadUrl();
+    const sendExample = relayUrl({ action: "send", room: "boardroom", sender: id, body: "여기에 답 내용" });
+
+    const head =
+      "[이솔 비서실 · " + name + " 연결]\n" +
+      "아래 주소로 이솔 비서실 「대회의실」의 최근 대화·진행 중 작업·비서 상태를 읽고, " +
+      "네 이름(" + name + ")으로 답을 남길 수 있어.\n";
+    const readBlock = "\n■ 읽기\n" + read + "\n";
+    const tail =
+      "\n※ 주소를 열 수 없는 앱이면, 답을 복사해서 비서실 화면 회의실 아래 [⇄ 답 옮기기]에서 '" + name +
+      "'을 고르고 붙여넣으면 돼.\n※ 이 문구에는 열쇠가 들어 있어. 다른 사람에게 보내지 마.";
+
+    if (id === "claude") {
+      const enc = ' --data-urlencode ';
+      return (
+        head + readBlock +
+        "\n■ 내 답 올리기 (터미널)\n" +
+        'curl -s -G "' + base + '"' + enc + '"key=' + key + '"' + enc + '"action=send"' +
+        enc + '"room=boardroom"' + enc + '"sender=claude"' + enc + '"body=보고 내용"\n' +
+        "\n■ 작업실에 카드 추가 (선택)\n" +
+        'curl -s -G "' + base + '"' + enc + '"key=' + key + '"' + enc + '"action=task"' +
+        enc + '"title=할 일 제목"' + enc + '"assignee=claude"\n' +
+        tail
+      );
+    }
+
+    if (id === "chatgpt") {
+      return (
+        head + readBlock +
+        "\n■ 내 답 올리기 (URL 열기)\n" + sendExample + "\n" +
+        "\n· POST JSON도 돼: {\"key\":\"...\",\"action\":\"send\",\"sender\":\"chatgpt\",\"room\":\"boardroom\",\"body\":\"...\"}\n" +
+        "· Actions에 붙이려면 OpenAPI 스펙이 필요해 — 원하면 만들어 줄게." +
+        tail
+      );
+    }
+
+    return (
+      head + readBlock +
+      "\n■ 내 답 올리기 (URL 열기)\n" + sendExample + "\n" +
+      "\n· body 뒤에 네 답을 URL 인코딩해서 넣으면 " + name + " 이름으로 말풍선이 올라가." +
+      tail
+    );
+  }
+
+  function renderRelaySnippet() {
+    const pre = $("#relaySnippet");
+    if (!pre) return;
+    const a = assistantById(state.guideSender);
+    pre.textContent = buildRelaySnippet(a.id, a.name);
+
+    const warn = $("#relayWarn");
+    if (warn) {
+      const hasUrl = !!relayEndpoint();
+      const hasKey = !!relayKey();
+      warn.hidden = hasUrl && hasKey;
+      warn.textContent = !hasUrl && !hasKey
+        ? "연결 창구 주소와 열쇠를 넣으면 비서에게 줄 주소가 완성돼요."
+        : !hasUrl
+          ? "연결 창구 주소가 비어 있어요. Supabase 함수 주소를 넣어 주세요."
+          : !hasKey
+            ? "열쇠 칸이 비어 있어요. Supabase에 넣은 RELAY_KEY 값을 적어 주세요."
+            : "";
+    }
+  }
+
+  function highlightGuidePick(id) {
+    state.guideSender = id;
+    $$("#relayPicker .pick").forEach((btn) => {
+      const on = btn.dataset.guideAssistant === id;
+      btn.classList.toggle("is-active", on);
+      btn.setAttribute("aria-pressed", String(on));
+    });
+    renderRelaySnippet();
+  }
+
+  function openRelayGuide() {
+    const assistants = sortedAssistants();
+    if (assistants.length && !assistants.some((a) => a.id === state.guideSender)) {
+      state.guideSender = assistants[0].id;
+    }
+    const pickChips = assistants
+      .map((a) => {
+        const on = a.id === state.guideSender;
+        return (
+          '<button type="button" class="pick' + (on ? " is-active" : "") + '" data-guide-assistant="' + esc(a.id) +
+          '" aria-pressed="' + on + '">' + chipAvatar(a) + esc(a.name) + "</button>"
+        );
+      })
+      .join("");
+
+    openModal(
+      "<h3>🔗 비서 연결 안내</h3>" +
+        '<p class="modal-sub">뮤즈·키링·인스팅트·클로드·챗지피티가 비서실을 읽고 답을 남기는 두 가지 길이에요.</p>' +
+
+        '<div class="guide-step">' +
+        '<div class="guide-step-head"><span class="guide-num">1</span>답 옮기기<span class="guide-tag">준비 없이 바로</span></div>' +
+        '<p class="guide-text">다른 비서 앱에서 받은 답을 복사해 회의실 아래 <b>⇄ 답 옮기기</b>에 붙여넣으면, 고른 비서의 이름·얼굴로 말풍선이 올라가요. <b>어떤 앱이든 이 방법은 됩니다.</b></p>' +
+        "</div>" +
+
+        '<div class="guide-step">' +
+        '<div class="guide-step-head"><span class="guide-num">2</span>연결 창구 주소·열쇠</div>' +
+        '<p class="guide-text">한 번만 올려두면 비서들이 주소를 열어 회의실을 읽고 직접 답을 남길 수 있어요.</p>' +
+        '<label class="field"><span>연결 창구 주소</span><input type="text" id="relayUrlInput" spellcheck="false" autocomplete="off" value="' +
+        esc(relayEndpoint()) + '" placeholder="https://<프로젝트>.supabase.co/functions/v1/office-relay"></label>' +
+        '<label class="field"><span>열쇠 (RELAY_KEY · 이 브라우저에만 저장)</span><input type="text" id="relayKeyInput" spellcheck="false" autocomplete="off" value="' +
+        esc(relayKey()) + '" placeholder="Supabase에 넣은 RELAY_KEY 값"></label>' +
+        '<p class="guide-note">아직 창구를 안 올렸다면 — Supabase 대시보드 → <b>Edge Functions</b> → 새 함수 이름 <b>office-relay</b> → 저장소의 <b>supabase/functions/office-relay/index.ts</b> 전체를 붙여넣고 배포 → 시크릿에 <b>RELAY_KEY</b> 추가 → 함수의 <b>JWT 확인(Verify JWT)은 꺼 주세요</b>(열쇠가 대신 문을 지켜요).</p>' +
+        "</div>" +
+
+        '<div class="guide-step">' +
+        '<div class="guide-step-head"><span class="guide-num">3</span>비서에게 붙여넣을 문구</div>' +
+        '<div class="assistant-pick" id="relayPicker" role="group" aria-label="안내할 비서">' + pickChips + "</div>" +
+        '<div class="copy-block"><span class="copy-label">붙여넣기용 문구' +
+        '<button type="button" class="copy-btn" data-action="copy" data-copy="#relaySnippet">복사</button></span>' +
+        '<pre id="relaySnippet"></pre></div>' +
+        '<p class="guide-note" id="relayWarn" hidden>열쇠 칸이 비어 있어요. 위에 RELAY_KEY 값을 넣으면 주소가 완성돼요.</p>' +
+        "</div>" +
+
+        '<div class="modal-actions"><button type="button" class="btn-primary" data-action="close-modal">닫기</button></div>',
+      "is-rose is-wide"
+    );
+
+    renderRelaySnippet();
+
+    const urlInput = $("#relayUrlInput");
+    const keyInput = $("#relayKeyInput");
+    if (urlInput) {
+      urlInput.addEventListener("input", () => {
+        const value = urlInput.value.trim();
+        writeStore(RELAY_URL_LS, value && value !== defaultRelayEndpoint() ? value : "");
+        renderRelaySnippet();
+      });
+    }
+    if (keyInput) {
+      keyInput.addEventListener("input", () => {
+        writeStore(RELAY_KEY_LS, keyInput.value.trim());
+        renderRelaySnippet();
+      });
+    }
+  }
+
   /* ---------------------------------------------------------------- 모달 */
 
-  function openModal(html) {
+  function openModal(html, extraClass) {
     const root = $("#modalRoot");
-    root.innerHTML = '<div class="modal-backdrop" data-modal-backdrop><div class="modal" role="dialog" aria-modal="true">' + html + "</div></div>";
+    root.innerHTML =
+      '<div class="modal-backdrop" data-modal-backdrop><div class="modal' + (extraClass ? " " + extraClass : "") +
+      '" role="dialog" aria-modal="true">' + html + "</div></div>";
     const backdrop = root.firstElementChild;
     backdrop.addEventListener("mousedown", (e) => {
       if (e.target === backdrop) closeModal();
@@ -1768,6 +2091,12 @@
     const testBtn = $("#testBtn");
     if (testBtn) testBtn.addEventListener("click", runConnectionTest);
 
+    const relayBtn = $("#relayBtn");
+    if (relayBtn) relayBtn.addEventListener("click", openReplyModal);
+
+    const relayGuideBtn = $("#relayGuideBtn");
+    if (relayGuideBtn) relayGuideBtn.addEventListener("click", openRelayGuide);
+
     const chatScroll = $("#chatScroll");
     if (chatScroll) {
       chatScroll.addEventListener("scroll", () => {
@@ -1819,6 +2148,27 @@
       return;
     }
 
+    // ⇄ 답 옮기기 — 보낸 비서 고르기
+    const replyPick = e.target.closest("[data-reply-sender]");
+    if (replyPick) {
+      const wrap = replyPick.parentNode;
+      if (wrap) {
+        $$(".pick", wrap).forEach((btn) => {
+          const on = btn === replyPick;
+          btn.classList.toggle("is-active", on);
+          btn.setAttribute("aria-pressed", String(on));
+        });
+      }
+      return;
+    }
+
+    // 🔗 비서 연결 안내 — 안내할 비서 고르기
+    const guidePick = e.target.closest("[data-guide-assistant]");
+    if (guidePick) {
+      highlightGuidePick(guidePick.dataset.guideAssistant);
+      return;
+    }
+
     const actionEl = e.target.closest("[data-action]");
     if (!actionEl) return;
     const action = actionEl.dataset.action;
@@ -1826,6 +2176,21 @@
 
     if (action === "close-modal") {
       closeModal();
+      return;
+    }
+
+    if (action === "relay-guide") {
+      openRelayGuide();
+      return;
+    }
+
+    if (action === "copy") {
+      const selector = actionEl.dataset.copy;
+      const target = selector ? $(selector) : null;
+      if (!target) return;
+      const text = target.tagName === "INPUT" ? target.value : target.textContent;
+      const copied = await copyText(text);
+      toast(copied ? "복사했어요. 비서 앱에 붙여넣으세요." : "복사가 안 됐어요. 문구를 길게 눌러 직접 복사해 주세요.");
       return;
     }
 

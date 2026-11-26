@@ -11,6 +11,7 @@
 """
 import pathlib
 import re
+import shutil
 
 ROOT = pathlib.Path(__file__).resolve().parent
 OUT = ROOT / "dist" / "이솔-비서실-데모.html"
@@ -49,4 +50,11 @@ if missing:
 
 OUT.parent.mkdir(parents=True, exist_ok=True)
 OUT.write_text(html, encoding="utf-8")
+
+# 데모 파일은 dist/ 안에 있으므로, 비서 프로필 사진도 dist/assets 로 같이 복사한다.
+# (같이 두지 않으면 사진 대신 이모지 폴백으로 보인다.)
+src_assets = ROOT / "assets"
+if src_assets.is_dir():
+    shutil.copytree(src_assets, OUT.parent / "assets", dirs_exist_ok=True)
+
 print("wrote", OUT, len(html), "bytes")

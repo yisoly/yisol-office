@@ -127,6 +127,16 @@ alter table public.memos      enable row level security;
 -- 비로그인(anon) 권한 회수 — RLS가 뚫려도 테이블 자체에 접근할 수 없게 한다.
 revoke all on table public.assistants, public.messages, public.tasks, public.memos from anon;
 
+-- 서비스 역할(Edge Function 'office-relay' 연결 창구)에도 테이블 권한을 준다.
+--   · 이 프로젝트는 기본값으로 service_role 에도 GRANT 가 없어서
+--     연결 창구가 '42501 permission denied' 로 막혔습니다.
+--   · RLS 는 service_role 에 적용되지 않습니다(bypass). 창구는 대신 RELAY_KEY 열쇠로 문을 지킵니다.
+--   · 창구 함수 내부에 '이솔 님 계정 세션으로 다시 시도하는' 대체 경로도 있지만,
+--     이 GRANT 를 실행해 두면 두 경로 중 앞쪽(빠른 길)으로 바로 동작합니다.
+grant usage on schema public to service_role;
+grant select, insert, update, delete on table public.assistants, public.messages, public.tasks, public.memos to service_role;
+grant usage, select on all sequences in schema public to service_role;
+
 -- 로그인한 사용자에게는 4개 테이블 읽기/쓰기 허용 (RLS 정책이 실제 조건을 판단)
 grant select, insert, update, delete on table public.assistants, public.messages, public.tasks, public.memos to authenticated;
 

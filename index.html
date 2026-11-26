@@ -12,7 +12,7 @@
 <title>이솔 비서실</title>
 <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png?v=20261126-10" />
 <link rel="icon" type="image/png" href="assets/icon-512.png?v=20261126-10" />
-<link rel="stylesheet" href="styles.css?v=20261126-10" />
+<link rel="stylesheet" href="styles.css?v=20261126-11" />
 </head>
 <body>
 <div class="stage">
@@ -101,7 +101,10 @@
           </div>
           <div class="composer-foot">
             <p class="composer-hint" id="composerHint"><span class="kbd-hint">⌘/Ctrl + Enter 전송 · </span>받는 비서를 고르면 그 비서에게만 전달돼요</p>
-            <button class="test-btn" type="button" id="testBtn">연결 테스트</button>
+            <div class="composer-tools">
+              <button class="test-btn" type="button" id="testBtn">연결 테스트</button>
+              <button class="relay-btn" type="button" id="relayBtn" title="다른 비서 앱에서 받은 답을 회의실 말풍선으로 옮깁니다">⇄ 답 옮기기</button>
+            </div>
           </div>
         </form>
       </section>
@@ -132,7 +135,10 @@
               <h2>비서현황</h2>
               <p>여섯 비서의 상태와 요즘 맡고 있는 일.</p>
             </div>
-            <span class="live-count" id="teamCount"></span>
+            <div class="pane-head-actions">
+              <span class="live-count" id="teamCount"></span>
+              <button class="guide-btn" type="button" id="relayGuideBtn">🔗 비서 연결 안내</button>
+            </div>
           </div>
           <div class="team-grid" id="teamGrid"></div>
           <p class="foot-note">상태를 바꾸면 회의실 상단의 ‘ON n명’ 표시도 함께 바뀝니다.</p>
@@ -193,6 +199,6 @@
 <div id="modalRoot"></div>
 
 <script src="config.js?v=20261126-9"></script>
-<script src="app.js?v=20261126-10"></script>
+<script src="app.js?v=20261126-11"></script>
 </body>
 </html>
