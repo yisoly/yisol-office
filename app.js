@@ -53,12 +53,22 @@
 
   const STATE_LABEL = { on: "ON", standby: "대기", off: "오프" };
 
+  /* 비서별 아바타 사진과, 사진이 안 뜰 때의 이모지 폴백 */
+  const AVATAR_EMOJI = {
+    miu: "🐈‍⬛",
+    claude: "✦",
+    muse: "🎧",
+    keyring: "🔑",
+    chatgpt: "💬",
+    instinct: "⚡"
+  };
+
   const ASSISTANT_SEED = [
     {
       id: "miu",
       name: "미우",
       role: "메인비서 · 피클",
-      avatar: "🐈‍⬛",
+      avatar: "assets/avatars/miu.jpg",
       accent: "#7B4B24",
       status: "on",
       areas: ["일정·브리핑", "쿠팡·쇼핑", "전화·예약", "기억과 기록"],
@@ -69,7 +79,7 @@
       id: "claude",
       name: "클로드",
       role: "맥 실무비서 · ai-office",
-      avatar: "✦",
+      avatar: "assets/avatars/claude.jpg",
       accent: "#C96442",
       status: "on",
       areas: ["회계·급여", "문서·계약", "인사"],
@@ -80,7 +90,7 @@
       id: "muse",
       name: "뮤즈",
       role: "서브비서",
-      avatar: "🎧",
+      avatar: "assets/avatars/muse.jpg",
       accent: "#7A6BB5",
       status: "on",
       areas: ["블로그·콘텐츠", "리서치", "체험단"],
@@ -91,7 +101,7 @@
       id: "keyring",
       name: "키링",
       role: "서브비서",
-      avatar: "🔑",
+      avatar: "assets/avatars/keyring.jpg",
       accent: "#3E8E7E",
       status: "on",
       areas: ["배송·구매", "생활 리마인드", "기록 정리"],
@@ -102,7 +112,7 @@
       id: "chatgpt",
       name: "챗지피티",
       role: "서브비서",
-      avatar: "💬",
+      avatar: "assets/avatars/chatgpt.jpg",
       accent: "#10A37F",
       status: "on",
       areas: ["자료 조사", "초안 작성", "아이디어"],
@@ -113,7 +123,7 @@
       id: "instinct",
       name: "인스팅트",
       role: "서브비서 · 교본 보관",
-      avatar: "⚡",
+      avatar: "assets/avatars/instinct.jpg",
       accent: "#B8860B",
       status: "on",
       areas: ["교본·자료 정리", "지식 베이스", "아이디어"],
@@ -286,6 +296,41 @@
   function assistantName(id) {
     if (!id || id === "all") return "전체";
     return assistantById(id).name;
+  }
+
+  function isPhotoPath(value) {
+    return typeof value === "string" && /^[\w./-]+\.(png|jpe?g|webp|gif|svg)$/i.test(value.trim());
+  }
+
+  function avatarFallback(a) {
+    if (!a) return "🤖";
+    if (AVATAR_EMOJI[a.id]) return AVATAR_EMOJI[a.id];
+    return isPhotoPath(a.avatar) ? "🤖" : a.avatar || "🤖";
+  }
+
+  // 사진이 있으면 둥근 사진으로, 없거나 로드에 실패하면 이모지로 보여준다.
+  function avatarMarkup(a, cls) {
+    const photo = isPhotoPath(a.avatar) ? a.avatar.trim() : "";
+    const style = ' style="--accent:' + esc(a.accent || "#7B4B24") + '"';
+    if (!photo) return '<div class="' + cls + '"' + style + ' aria-hidden="true">' + esc(avatarFallback(a)) + "</div>";
+    return (
+      '<div class="' + cls + ' has-photo"' + style + ' aria-hidden="true">' +
+      '<img src="' + esc(photo) + '" alt="" loading="lazy" decoding="async" ' +
+      'onerror="this.parentNode.classList.add(&#39;is-fallback&#39;);this.remove();">' +
+      '<span class="avatar-emoji">' + esc(avatarFallback(a)) + "</span></div>"
+    );
+  }
+
+  // 칩·카드 안에 들어가는 작은 아바타
+  function chipAvatar(a) {
+    const photo = isPhotoPath(a.avatar) ? a.avatar.trim() : "";
+    if (!photo) return '<span class="emoji" aria-hidden="true">' + esc(avatarFallback(a)) + "</span>";
+    return (
+      '<span class="emoji has-photo" aria-hidden="true">' +
+      '<img src="' + esc(photo) + '" alt="" loading="lazy" decoding="async" ' +
+      'onerror="this.parentNode.classList.add(&#39;is-fallback&#39;);this.remove();">' +
+      '<span class="avatar-emoji">' + esc(avatarFallback(a)) + "</span></span>"
+    );
   }
 
   function sortByTime(list, key) {
@@ -892,10 +937,10 @@
       .map((id) => {
         const active = state.recipient === id;
         const label = id === "all" ? "전체" : assistantName(id);
-        const emoji = id === "all" ? "👥" : assistantById(id).avatar;
+        const face = id === "all" ? '<span class="emoji" aria-hidden="true">👥</span>' : chipAvatar(assistantById(id));
         return (
           '<button type="button" class="recipient' + (active ? " is-active" : "") + '" data-recipient="' + esc(id) +
-          '" aria-pressed="' + active + '"><span class="emoji" aria-hidden="true">' + esc(emoji) + "</span>" +
+          '" aria-pressed="' + active + '">' + face +
           esc(label) + "</button>"
         );
       })
@@ -906,7 +951,7 @@
     const a = assistantById(m.sender_id);
     return (
       '<article class="msg msg-assistant" data-id="' + esc(m.id) + '">' +
-      '<div class="avatar" style="--accent:' + esc(a.accent || "#7B4B24") + '" aria-hidden="true">' + esc(a.avatar || "🤖") + "</div>" +
+      avatarMarkup(a, "avatar") +
       '<div class="msg-body">' +
       '<div class="msg-head"><span class="msg-name">' + esc(a.name || m.sender_name) + "</span>" +
       '<span class="role-badge">' + esc(a.role || "비서") + "</span>" +
@@ -1022,8 +1067,8 @@
       })
       .join("");
 
-    const assigneeChips = [{ id: "all", name: "전체 담당", avatar: "👥" }].concat(
-      db.assistants.map((a) => ({ id: a.id, name: a.name, avatar: a.avatar }))
+    const assigneeChips = [{ id: "all", name: "전체 담당", face: '<span class="emoji" aria-hidden="true">👥</span>' }].concat(
+      db.assistants.map((a) => ({ id: a.id, name: a.name, face: chipAvatar(a) }))
     );
     assigneeWrap.innerHTML = assigneeChips
       .map((a) => {
@@ -1031,7 +1076,7 @@
         const n = a.id === "all" ? db.tasks.length : db.tasks.filter((t) => t.assignee === a.id).length;
         return (
           '<button type="button" class="chip' + (active ? " is-active" : "") + '" data-filter="assignee" data-value="' +
-          esc(a.id) + '" aria-pressed="' + active + '"><span aria-hidden="true">' + esc(a.avatar) + "</span> " +
+          esc(a.id) + '" aria-pressed="' + active + '">' + a.face + " " +
           esc(a.name) + '<span class="n">' + n + "</span></button>"
         );
       })
@@ -1050,7 +1095,7 @@
     return (
       '<article class="task-card" data-id="' + esc(task.id) + '">' +
       '<div class="task-top">' +
-      '<span class="assignee-tag"><span aria-hidden="true">' + esc(a.avatar) + "</span>" + esc(a.name) + "</span>" +
+      '<span class="assignee-tag">' + chipAvatar(a) + esc(a.name) + "</span>" +
       (due.text ? '<span class="due ' + due.cls + '">' + esc(due.text) + "</span>" : "") +
       "</div>" +
       '<h3 class="task-title">' + esc(task.title) + "</h3>" + detail +
@@ -1091,7 +1136,7 @@
         return (
           '<article class="team-card" style="--accent:' + esc(a.accent || "#7B4B24") + '" data-id="' + esc(a.id) + '">' +
           '<div class="team-head">' +
-          '<div class="avatar lg" style="--accent:' + esc(a.accent || "#7B4B24") + '" aria-hidden="true">' + esc(a.avatar || "🤖") + "</div>" +
+          avatarMarkup(a, "avatar lg") +
           '<div class="team-id"><h3>' + esc(a.name) + "</h3><p>" + esc(a.role) + "</p></div>" +
           '<div class="state-switch" role="group" aria-label="' + esc(a.name) + ' 상태 변경">' + stateButtons + "</div>" +
           "</div>" +
@@ -1282,7 +1327,7 @@
       .map(
         (a) =>
           '<option value="' + esc(a.id) + '"' + (editing && task.assignee === a.id ? " selected" : "") + ">" +
-          esc(a.avatar) + " " + esc(a.name) + "</option>"
+          esc(avatarFallback(a)) + " " + esc(a.name) + "</option>"
       )
       .join("");
     const statusOptions = TASK_COLUMNS.map(

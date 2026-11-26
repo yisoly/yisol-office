@@ -13,7 +13,7 @@ create table if not exists public.assistants (
   id          text primary key,
   name        text not null,
   role        text not null default '비서',
-  avatar      text not null default '🤖',
+  avatar      text not null default '🤖',   -- assets/avatars/<id>.jpg (없으면 이모지로 폴백)
   accent      text not null default '#7B4B24',
   status      text not null default 'on' check (status in ('on', 'standby', 'off')),
   areas       text[] not null default '{}',
@@ -175,12 +175,12 @@ $$;
 -- ---------------------------------------------------------------------------
 insert into public.assistants (id, name, role, avatar, accent, status, areas, summary, sort_order)
 values
-  ('miu',     '미우',    '메인비서 · 피클',        '🐈‍⬛', '#7B4B24', 'on', array['일정·브리핑','쿠팡·쇼핑','전화·예약','기억과 기록'], '비서실 문을 열었어요', 1),
-  ('claude',  '클로드',  '맥 실무비서 · ai-office', '✦',      '#C96442', 'on', array['회계·급여','문서·계약','인사'], '맥 작업 공간에서 대기 중', 2),
-  ('muse',    '뮤즈',    '서브비서',               '🎧',     '#7A6BB5', 'on', array['블로그·콘텐츠','리서치','체험단'], '콘텐츠 초안 준비 중', 3),
-  ('keyring', '키링',    '서브비서',               '🔑',     '#3E8E7E', 'on', array['배송·구매','생활 리마인드','기록 정리'], '배송·리마인드 정리 중', 4),
-  ('chatgpt', '챗지피티', '서브비서',              '💬',     '#10A37F', 'on', array['자료 조사','초안 작성','아이디어'], '자료 조사 대기 중', 5),
-  ('instinct', '인스팅트', '서브비서 · 교본 보관',   '⚡',     '#B8860B', 'on', array['교본·자료 정리','지식 베이스','아이디어'], '교본 최신본 정리 중', 6)
+  ('miu',     '미우',    '메인비서 · 피클',        'assets/avatars/miu.jpg', '#7B4B24', 'on', array['일정·브리핑','쿠팡·쇼핑','전화·예약','기억과 기록'], '비서실 문을 열었어요', 1),
+  ('claude',  '클로드',  '맥 실무비서 · ai-office', 'assets/avatars/claude.jpg',      '#C96442', 'on', array['회계·급여','문서·계약','인사'], '맥 작업 공간에서 대기 중', 2),
+  ('muse',    '뮤즈',    '서브비서',               'assets/avatars/muse.jpg',     '#7A6BB5', 'on', array['블로그·콘텐츠','리서치','체험단'], '콘텐츠 초안 준비 중', 3),
+  ('keyring', '키링',    '서브비서',               'assets/avatars/keyring.jpg',     '#3E8E7E', 'on', array['배송·구매','생활 리마인드','기록 정리'], '배송·리마인드 정리 중', 4),
+  ('chatgpt', '챗지피티', '서브비서',              'assets/avatars/chatgpt.jpg',     '#10A37F', 'on', array['자료 조사','초안 작성','아이디어'], '자료 조사 대기 중', 5),
+  ('instinct', '인스팅트', '서브비서 · 교본 보관',   'assets/avatars/instinct.jpg',     '#B8860B', 'on', array['교본·자료 정리','지식 베이스','아이디어'], '교본 최신본 정리 중', 6)
 on conflict (id) do nothing;
 
 -- 시드: 첫 입장 메시지 (비어 있을 때만)

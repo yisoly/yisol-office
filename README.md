@@ -108,6 +108,7 @@ yisol-office/
 ├── styles.css          # 크림/브라운 테마, 반응형 (모바일 1열 / PC 다열)
 ├── app.js              # 상태·렌더링·CRUD·Supabase Realtime
 ├── config.js           # 이름과 Supabase 키 (여기만 고치면 됨)
+├── assets/avatars/     # 비서 프로필 사진 (256×256, miu·claude·muse·keyring·chatgpt·instinct.jpg)
 ├── supabase-schema.sql # 테이블 4개 + RLS + Realtime + 시드
 ├── build-standalone.py # 한 파일 데모 빌드 스크립트
 ├── dist/               # 빌드 결과 (이솔-비서실-데모.html)
@@ -146,6 +147,7 @@ yisol-office/
 | --- | --- |
 | 앱 이름·주인 표기 (`이솔 비서실`, `이솔님 전용`) | `config.js` 또는 각 HTML의 텍스트 |
 | 비서 이름·역할·아바타·담당 영역 | Supabase `assistants` 테이블(연결 시) / `app.js`의 `ASSISTANT_SEED`(데모 시) |
+| 비서 프로필 사진 | `assets/avatars/<id>.jpg` (256×256 정사각형). 사진이 없거나 로드에 실패하면 `APP.js`의 `AVATAR_EMOJI` 이모지로 폴백합니다. |
 | 회의실 방 이름·구성 | `app.js`의 `ROOMS` 배열 |
 | 색상·모서리·간격 | `styles.css` 상단 `:root` 변수 |
 | 데모 샘플 데이터 | `app.js`의 `buildSeed()` |
