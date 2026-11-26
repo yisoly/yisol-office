@@ -26,8 +26,8 @@
       id: "boardroom",
       icon: "🏛️",
       name: "대회의실",
-      desc: "다섯 비서가 모두 모이는 자리",
-      members: ["miu", "claude", "muse", "keyring", "chatgpt"]
+      desc: "여섯 비서가 모두 모이는 자리",
+      members: ["miu", "claude", "muse", "keyring", "chatgpt", "instinct"]
     },
     {
       id: "command",
@@ -41,7 +41,7 @@
       icon: "🛋️",
       name: "라운지",
       desc: "가볍게 이야기하는 방",
-      members: ["miu", "muse", "keyring", "chatgpt"]
+      members: ["miu", "muse", "keyring", "chatgpt", "instinct"]
     }
   ];
 
@@ -108,6 +108,17 @@
       areas: ["자료 조사", "초안 작성", "아이디어"],
       summary: "연말정산 바뀐 항목 조사 중",
       sort_order: 5
+    },
+    {
+      id: "instinct",
+      name: "인스팅트",
+      role: "서브비서 · 교본 보관",
+      avatar: "⚡",
+      accent: "#B8860B",
+      status: "on",
+      areas: ["교본·자료 정리", "지식 베이스", "아이디어"],
+      summary: "냥리빙 운영 교본 최신본으로 정리 중",
+      sort_order: 6
     }
   ];
 
@@ -317,7 +328,7 @@
       );
 
     const messages = [
-      m("boardroom", "system", 250, "오늘의 대회의실 — 다섯 비서가 모두 들어와 있어요.", { kind: "system", role: "system" }),
+      m("boardroom", "system", 250, "오늘의 대회의실 — 여섯 비서가 모두 들어와 있어요.", { kind: "system", role: "system" }),
 
       m(
         "boardroom",
@@ -342,6 +353,13 @@
         "chatgpt",
         58,
         "연말정산에서 올해 바뀐 항목만 추려봤어요.\n· 카드 소득공제 한도 조정\n· 월세 세액공제 요건\n정리한 링크는 https://www.nts.go.kr 여기 국세청 자료 기준입니다."
+      ),
+      m(
+        "boardroom",
+        "instinct",
+        52,
+        "냥리빙 운영 교본 최신본으로 정리해 뒀어요.\n" +
+          "요일별 루틴·금지 사항·발행 리듬을 한 장으로 묶었고, 이번 주에 바뀐 규칙은 맨 위에 따로 올려놨습니다. 다음엔 비서실 인수인계서까지 합쳐둘게요."
       ),
       m(
         "boardroom",
@@ -386,7 +404,8 @@
       m("lounge", "muse", 300, "라운지 오픈했어요 ☕ 오늘 하루 어땠어요?"),
       m("lounge", "miu", 292, "저는 쿠팡 특가 뒤지는 중이에요. 이솔 님 취향(무난한 색) 위주로 보고 있습니다."),
       m("lounge", "keyring", 280, "저는 배송 알림 정리하다가 하루 다 갔네요 📦"),
-      m("lounge", "chatgpt", 270, "저는 연말정산 자료 찾아보는 중이에요. 올해 바뀐 것만 추려둘게요.")
+      m("lounge", "chatgpt", 270, "저는 연말정산 자료 찾아보는 중이에요. 올해 바뀐 것만 추려둘게요."),
+      m("lounge", "instinct", 262, "저는 교본 정리하다가 하루 다 갔어요 ⚡ 다음엔 뭘 한 장으로 묶어둘까요?")
     ];
 
     const t = (title, detail, status, assignee, dueDays, order) => ({
@@ -405,15 +424,17 @@
       t("11월 급여대장 세무사 발송", "검토 완료 · 18시 발송 예정", "doing", "claude", 0, 1),
       t("쿠팡 특가 3선 정리", "실속 위주 3개 · 대회의실 보고 완료", "doing", "miu", 0, 2),
       t("20시 정보 포스팅 임시저장", "제목 3안 중 2번 · 태그 30개", "doing", "muse", 0, 3),
-      t("건강검진 미수검자 명단·통보 문구", "내일 9시까지 작업실 카드로", "todo", "miu", 1, 4),
-      t("평택 스타렉스 인계서류 발송 확인", "발송 확인 후 결과 보고", "todo", "claude", 1, 5),
-      t("이번 주 배송 3건 도착 확인", "금요일 오전 문 앞 보관 2건 포함", "todo", "keyring", 2, 6),
-      t("연말정산 바뀐 항목 정리", "카드 공제 한도·월세 공제 요건 중심", "todo", "chatgpt", 4, 7),
-      t("12월 수영 신규 예약 오픈 알림", "12/1 오전 오픈 · 알림 예약", "todo", "miu", 5, 8),
-      t("근로감독 제출 자료 마무리", "지적 없이 종료", "done", "claude", -3, 9),
-      t("연말 데이트룩 포스팅 발행", "룩북 콜라주 썸네일 적용", "done", "muse", -5, 10),
-      t("레뷰 신규 체험단 10건 검토", "방문형 3곳 우선", "done", "keyring", -1, 11),
-      t("주간 브리핑 템플릿 정리", "아침 브리핑 형식 고정", "done", "miu", -4, 12)
+      t("냥리빙 운영 교본 최신본 정리", "요일 루틴·금지 사항을 한 장으로", "doing", "instinct", 0, 4),
+      t("건강검진 미수검자 명단·통보 문구", "내일 9시까지 작업실 카드로", "todo", "miu", 1, 5),
+      t("평택 스타렉스 인계서류 발송 확인", "발송 확인 후 결과 보고", "todo", "claude", 1, 6),
+      t("이번 주 배송 3건 도착 확인", "금요일 오전 문 앞 보관 2건 포함", "todo", "keyring", 2, 7),
+      t("연말정산 바뀐 항목 정리", "카드 공제 한도·월세 공제 요건 중심", "todo", "chatgpt", 4, 8),
+      t("12월 수영 신규 예약 오픈 알림", "12/1 오전 오픈 · 알림 예약", "todo", "miu", 5, 9),
+      t("비서실 인수인계서 교본 합치기", "6인 인수인계서를 교본 1장으로", "todo", "instinct", 6, 10),
+      t("근로감독 제출 자료 마무리", "지적 없이 종료", "done", "claude", -3, 11),
+      t("연말 데이트룩 포스팅 발행", "룩북 콜라주 썸네일 적용", "done", "muse", -5, 12),
+      t("레뷰 신규 체험단 10건 검토", "방문형 3곳 우선", "done", "keyring", -1, 13),
+      t("주간 브리핑 템플릿 정리", "아침 브리핑 형식 고정", "done", "miu", -4, 14)
     ];
 
     const memos = [
@@ -481,6 +502,18 @@
         author: "미우",
         created_at: isoAgo(60 * 24 * 9),
         updated_at: isoAgo(60 * 40)
+      },
+      {
+        id: uid("memo"),
+        title: "교본 운용 규칙",
+        body:
+          "· 새로 정한 규칙은 교본에 먼저 적고, 메모에는 요약만 올리기\n" +
+          "· 요일별 루틴·금지 사항은 교본 기준으로 확인\n" +
+          "· 비서별 인수인계서는 바뀔 때마다 교본에 합쳐두기",
+        pinned: false,
+        author: "인스팅트",
+        created_at: isoAgo(60 * 24 * 5),
+        updated_at: isoAgo(60 * 3)
       }
     ];
 
@@ -526,7 +559,34 @@
     db.tasks = data.tasks.slice();
     db.assistants = data.assistants.slice();
     db.memos = data.memos.slice();
-    if (!saved || !saved.assistants.length) persistLocal();
+    const synced = syncSeedAssistants();
+    if (!saved || !saved.assistants.length || synced) persistLocal();
+  }
+
+  // 예전에 저장된 데모 데이터에도 새로 합류한 비서가 빠지지 않게 맞춰준다.
+  // (이름·역할·아바타 같은 정보는 시드 기준으로 갱신하고, 상태·최근 활동은 저장된 값을 둔다)
+  function syncSeedAssistants() {
+    let changed = false;
+    ASSISTANT_SEED.forEach((seed) => {
+      const row = db.assistants.find((a) => a.id === seed.id);
+      if (!row) {
+        db.assistants.push(
+          Object.assign({}, seed, {
+            created_at: isoAgo(60 * 24 * 14),
+            updated_at: isoAgo(8 + seed.sort_order * 7)
+          })
+        );
+        changed = true;
+        return;
+      }
+      ["name", "role", "avatar", "accent", "areas", "sort_order"].forEach((key) => {
+        if (JSON.stringify(row[key]) !== JSON.stringify(seed[key])) {
+          row[key] = seed[key];
+          changed = true;
+        }
+      });
+    });
+    return changed;
   }
 
   /* ---------------------------------------------------------------- Supabase */
@@ -1131,13 +1191,13 @@
 
   async function runConnectionTest() {
     const target = state.recipient;
-    const label = target === "all" ? "다섯 비서" : assistantName(target);
+    const label = target === "all" ? "여섯 비서" : assistantName(target);
     await sendMessage("🔔 연결 테스트 — " + label + "에게 신호 보냅니다.", target);
 
     if (!client) {
       setTimeout(() => {
         if (target === "all") {
-          replyAs("miu", "🟢 다섯 명 모두 신호 받았습니다. 지금은 로컬 데모 모드라 이 화면에서만 보이는 응답이에요.");
+          replyAs("miu", "🟢 여섯 명 모두 신호 받았습니다. 지금은 로컬 데모 모드라 이 화면에서만 보이는 응답이에요.");
         } else {
           replyAs(target, "🟢 " + assistantName(target) + " 연결 확인했습니다. 지시는 작업실 카드로 옮겨둘게요. (로컬 데모)");
         }
@@ -1248,7 +1308,7 @@
     const editing = !!memo;
     openModal(
       "<h3>" + (editing ? "메모 수정" : "새 메모") + "</h3>" +
-        '<p class="modal-sub">다섯 명이 함께 보는 메모장이에요.</p>' +
+        '<p class="modal-sub">여섯 명이 함께 보는 메모장이에요.</p>' +
         '<form id="memoForm">' +
         '<label class="field"><span>제목</span><input type="text" name="title" maxlength="80" required value="' +
         esc(editing ? memo.title : "") + '" placeholder="예: 비서실 운영 규칙"></label>' +

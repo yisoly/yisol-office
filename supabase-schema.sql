@@ -7,7 +7,7 @@
 create extension if not exists "pgcrypto";
 
 -- ---------------------------------------------------------------------------
--- 1) assistants : 비서 5명의 상태·담당 영역
+-- 1) assistants : 비서 6명의 상태·담당 영역
 -- ---------------------------------------------------------------------------
 create table if not exists public.assistants (
   id          text primary key,
@@ -171,7 +171,7 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- 시드: 비서 5명
+-- 시드: 비서 6명
 -- ---------------------------------------------------------------------------
 insert into public.assistants (id, name, role, avatar, accent, status, areas, summary, sort_order)
 values
@@ -179,14 +179,21 @@ values
   ('claude',  '클로드',  '맥 실무비서 · ai-office', '✦',      '#C96442', 'on', array['회계·급여','문서·계약','인사'], '맥 작업 공간에서 대기 중', 2),
   ('muse',    '뮤즈',    '서브비서',               '🎧',     '#7A6BB5', 'on', array['블로그·콘텐츠','리서치','체험단'], '콘텐츠 초안 준비 중', 3),
   ('keyring', '키링',    '서브비서',               '🔑',     '#3E8E7E', 'on', array['배송·구매','생활 리마인드','기록 정리'], '배송·리마인드 정리 중', 4),
-  ('chatgpt', '챗지피티', '서브비서',              '💬',     '#10A37F', 'on', array['자료 조사','초안 작성','아이디어'], '자료 조사 대기 중', 5)
+  ('chatgpt', '챗지피티', '서브비서',              '💬',     '#10A37F', 'on', array['자료 조사','초안 작성','아이디어'], '자료 조사 대기 중', 5),
+  ('instinct', '인스팅트', '서브비서 · 교본 보관',   '⚡',     '#B8860B', 'on', array['교본·자료 정리','지식 베이스','아이디어'], '교본 최신본 정리 중', 6)
 on conflict (id) do nothing;
 
 -- 시드: 첫 입장 메시지 (비어 있을 때만)
 insert into public.messages (room, sender_id, sender_name, role, kind, body)
 select 'boardroom', 'system', '비서실', 'system', 'system',
-       '이솔 비서실이 문을 열었어요 — 미우 · 클로드 · 뮤즈 · 키링 · 챗지피티가 들어와 있습니다.'
+       '이솔 비서실이 문을 열었어요 — 미우 · 클로드 · 뮤즈 · 키링 · 챗지피티 · 인스팅트가 들어와 있습니다.'
 where not exists (select 1 from public.messages);
+
+-- 인스팅트 합류 안내 (이미 비서실을 쓰고 있던 경우에도 한 번만 남는다)
+insert into public.messages (room, sender_id, sender_name, role, kind, body)
+select 'boardroom', 'system', '비서실', 'system', 'system',
+       '여섯 번째 비서 인스팅트가 합류했어요 — 미우 · 클로드 · 뮤즈 · 키링 · 챗지피티 · 인스팅트.'
+where not exists (select 1 from public.messages where body like '%인스팅트%');
 
 -- 시드: 운영 규칙 메모 (메모가 비어 있을 때만)
 insert into public.memos (title, body, pinned, author)
