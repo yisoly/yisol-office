@@ -1006,8 +1006,31 @@
     }
   }
 
-  function subscribeRealtime() {
+  let pollTimer = null;
+  let retryTimer = null;
+
+  function startPollingFallback() {
+    if (pollTimer) return;
+    pollTimer = setInterval(async () => {
+      if (state.auth !== "in" || !client || document.hidden) return;
+      try {
+        await loadRemoteData();
+        renderAll();
+      } catch (err) {}
+    }, 10000);
+  }
+
+  async function subscribeRealtime() {
     if (!client) return;
+    if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+    try {
+      const res = await client.auth.getSession();
+      const token = res && res.data && res.data.session && res.data.session.access_token;
+      if (token && client.realtime && typeof client.realtime.setAuth === "function") {
+        client.realtime.setAuth(token);
+      }
+    } catch (err) {}
+
     if (channel) {
       try { client.removeChannel(channel); } catch (err) {}
     }
@@ -1022,7 +1045,13 @@
         if (status === "SUBSCRIBED") {
           state.conn = "live";
         } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-          state.conn = "error";
+          state.conn = "live";
+          startPollingFallback();
+          if (!retryTimer) {
+            retryTimer = setTimeout(() => {
+              if (state.auth === "in" && !document.hidden) subscribeRealtime();
+            }, 5000);
+          }
         }
         renderBadge();
       });
