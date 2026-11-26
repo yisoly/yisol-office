@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#FAF7F0" />
+<meta name="robots" content="noindex, nofollow" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="이솔 비서실" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="description" content="이솔님 전용 비서실 — 미우·클로드·뮤즈·키링이 모이는 회의실, 작업실, 비서현황, 메모." />
+<title>이솔 비서실</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%23F6E9CE'/%3E%3Ctext x='50' y='72' font-size='58' text-anchor='middle'%3E%F0%9F%91%91%3C/text%3E%3C/svg%3E" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="stage">
+  <div class="app" id="app">
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M3.6 8.4l3.5 2.7L12 4.8l4.9 6.3 3.5-2.7-1.5 8.4c-.1.6-.7 1.1-1.3 1.1H6.4c-.6 0-1.2-.5-1.3-1.1L3.6 8.4z" fill="currentColor"/>
+            <path d="M7.2 21h9.6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1 id="appTitle">이솔 비서실</h1>
+          <p class="brand-sub"><span class="brand-dot" aria-hidden="true"></span><span id="ownerLabel">이솔님 전용</span></p>
+        </div>
+      </div>
+      <button class="conn-badge is-demo" id="connBadge" type="button" aria-live="polite">
+        <span class="conn-dot" aria-hidden="true"></span><span id="connText">로컬 데모</span>
+      </button>
+    </header>
+
+    <nav class="tabs" id="tabs" role="tablist" aria-label="비서실 메뉴">
+      <button class="tab is-active" type="button" role="tab" data-tab="meeting" aria-selected="true" aria-controls="view-meeting">
+        <span class="tab-ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4.6 5.6h14.8a1.2 1.2 0 0 1 1.2 1.2v8.6a1.2 1.2 0 0 1-1.2 1.2h-7.1l-4.3 3.1v-3.1H4.6a1.2 1.2 0 0 1-1.2-1.2V6.8a1.2 1.2 0 0 1 1.2-1.2z"/>
+            <path d="M8 9.6h8M8 13h5"/>
+          </svg>
+        </span>
+        <span class="tab-label">회의실</span>
+      </button>
+      <button class="tab" type="button" role="tab" data-tab="tasks" aria-selected="false" aria-controls="view-tasks">
+        <span class="tab-ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4.8" y="4.4" width="14.4" height="16.2" rx="2.6"/>
+            <path d="M9.4 4.4V3.6c0-.6.5-1.1 1.1-1.1h3c.6 0 1.1.5 1.1 1.1v.8"/>
+            <path d="M8.4 10h7.2M8.4 13.6h7.2M8.4 17.2h4.2"/>
+          </svg>
+        </span>
+        <span class="tab-label">작업실</span>
+      </button>
+      <button class="tab" type="button" role="tab" data-tab="team" aria-selected="false" aria-controls="view-team">
+        <span class="tab-ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4.4 19.6h15.2"/>
+            <path d="M6.8 19.2v-5.4M12 19.2V6.4M17.2 19.2v-8.6"/>
+          </svg>
+        </span>
+        <span class="tab-label">비서현황</span>
+      </button>
+      <button class="tab" type="button" role="tab" data-tab="memos" aria-selected="false" aria-controls="view-memos">
+        <span class="tab-ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6.2 3.6h7.6l4.4 4.4v12.4c0 .7-.5 1.2-1.2 1.2H6.2c-.7 0-1.2-.5-1.2-1.2V4.8c0-.7.5-1.2 1.2-1.2z"/>
+            <path d="M13.6 3.8v4.4h4.4"/>
+            <path d="M8.4 12.6h6.6M8.4 16.2h4.6"/>
+          </svg>
+        </span>
+        <span class="tab-label">메모</span>
+      </button>
+    </nav>
+
+    <main class="views" id="views">
+      <!-- 회의실 -->
+      <section class="view is-active" id="view-meeting" data-view="meeting" role="tabpanel" aria-label="회의실">
+        <div class="room-tabs" id="roomTabs" role="tablist" aria-label="회의실 방"></div>
+        <p class="room-status" id="roomStatus"></p>
+        <div class="chat-scroll" id="chatScroll">
+          <div class="chat-list" id="chatList"></div>
+        </div>
+        <form class="composer" id="composer" autocomplete="off">
+          <div class="recipients" id="recipients" role="group" aria-label="받는 비서"></div>
+          <div class="composer-input">
+            <textarea id="messageInput" rows="1" placeholder="이솔 님도 직접 메시지·지시를 남겨보세요" aria-label="메시지 입력"></textarea>
+            <button class="send-btn" type="submit" aria-label="보내기">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4.5 12h13.6M12.4 6.2l6.2 5.8-6.2 5.8"/>
+              </svg>
+            </button>
+          </div>
+          <div class="composer-foot">
+            <p class="composer-hint" id="composerHint"><span class="kbd-hint">⌘/Ctrl + Enter 전송 · </span>받는 비서를 고르면 그 비서에게만 전달돼요</p>
+            <button class="test-btn" type="button" id="testBtn">연결 테스트</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- 작업실 -->
+      <section class="view" id="view-tasks" data-view="tasks" role="tabpanel" aria-label="작업실">
+        <div class="pane">
+          <div class="pane-head">
+            <div>
+              <h2>작업실</h2>
+              <p>맡은 일이 카드로 쌓이고, 상태를 바꾸면 다섯이 같이 봅니다.</p>
+            </div>
+            <button class="primary-btn" type="button" data-action="new-task">+ 새 작업</button>
+          </div>
+          <div class="filters">
+            <div class="chips" id="statusFilter" role="group" aria-label="상태 필터"></div>
+            <div class="chips" id="assigneeFilter" role="group" aria-label="담당 필터"></div>
+          </div>
+          <div class="board" id="board"></div>
+        </div>
+      </section>
+
+      <!-- 비서현황 -->
+      <section class="view" id="view-team" data-view="team" role="tabpanel" aria-label="비서현황">
+        <div class="pane">
+          <div class="pane-head">
+            <div>
+              <h2>비서현황</h2>
+              <p>다섯 비서의 상태와 요즘 맡고 있는 일.</p>
+            </div>
+            <span class="live-count" id="teamCount"></span>
+          </div>
+          <div class="team-grid" id="teamGrid"></div>
+          <p class="foot-note">상태를 바꾸면 회의실 상단의 ‘ON n명’ 표시도 함께 바뀝니다.</p>
+        </div>
+      </section>
+
+      <!-- 메모 -->
+      <section class="view" id="view-memos" data-view="memos" role="tabpanel" aria-label="메모">
+        <div class="pane">
+          <div class="pane-head">
+            <div>
+              <h2>메모</h2>
+              <p>다섯이 같이 보는 공유 메모장. 중요한 건 위에 고정해 두세요.</p>
+            </div>
+            <button class="primary-btn" type="button" data-action="new-memo">+ 새 메모</button>
+          </div>
+          <div class="memo-grid" id="memoGrid"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div id="modalRoot"></div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
