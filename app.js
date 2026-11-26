@@ -554,19 +554,24 @@
 
   function useLocalData() {
     const saved = loadLocal();
-    const data = saved && saved.assistants.length ? saved : buildSeed();
+    const fresh = !(saved && saved.assistants.length);
+    const data = fresh ? buildSeed() : saved;
     db.messages = data.messages.slice();
     db.tasks = data.tasks.slice();
     db.assistants = data.assistants.slice();
     db.memos = data.memos.slice();
+
     const synced = syncSeedAssistants();
-    if (!saved || !saved.assistants.length || synced) persistLocal();
+    let extra = refreshSeedWording();
+    if (!fresh && synced.added.length) extra = announceJoined(synced.added) || extra;
+    if (fresh || synced.changed || extra) persistLocal();
   }
 
   // 예전에 저장된 데모 데이터에도 새로 합류한 비서가 빠지지 않게 맞춰준다.
   // (이름·역할·아바타 같은 정보는 시드 기준으로 갱신하고, 상태·최근 활동은 저장된 값을 둔다)
   function syncSeedAssistants() {
     let changed = false;
+    const added = [];
     ASSISTANT_SEED.forEach((seed) => {
       const row = db.assistants.find((a) => a.id === seed.id);
       if (!row) {
@@ -576,6 +581,7 @@
             updated_at: isoAgo(8 + seed.sort_order * 7)
           })
         );
+        added.push(seed);
         changed = true;
         return;
       }
@@ -586,7 +592,37 @@
         }
       });
     });
-    return changed;
+    return { changed: changed, added: added };
+  }
+
+  // 예전 시드 문구(‘다섯 비서’)는 인원에 맞게 고쳐 쓴다.
+  function refreshSeedWording() {
+    let touched = false;
+    db.messages.forEach((m) => {
+      if (m.kind === "system" && m.body === "오늘의 대회의실 — 다섯 비서가 모두 들어와 있어요.") {
+        m.body = "오늘의 대회의실 — 여섯 비서가 모두 들어와 있어요.";
+        touched = true;
+      }
+    });
+    return touched;
+  }
+
+  // 이미 쓰던 화면이면, 새로 합류한 비서를 대회의실에 한 번 알린다.
+  function announceJoined(added) {
+    if (!added.length) return false;
+    const names = added.map((a) => a.name).join(" · ");
+    db.messages.push({
+      id: uid("msg"),
+      room: "boardroom",
+      sender_id: "system",
+      sender_name: "비서실",
+      role: "system",
+      kind: "system",
+      body: names + "가 합류했어요 — 이제 " + db.assistants.length + "명이 함께 일합니다.",
+      recipient: "all",
+      created_at: nowIso()
+    });
+    return true;
   }
 
   /* ---------------------------------------------------------------- Supabase */
