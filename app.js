@@ -561,10 +561,14 @@
     db.assistants = data.assistants.slice();
     db.memos = data.memos.slice();
 
-    const synced = syncSeedAssistants();
-    let extra = refreshSeedWording();
-    if (!fresh && synced.added.length) extra = announceJoined(synced.added) || extra;
-    if (fresh || synced.changed || extra) persistLocal();
+    try {
+      const synced = syncSeedAssistants();
+      let extra = refreshSeedWording();
+      if (!fresh && synced.added.length) extra = announceJoined(synced.added) || extra;
+      if (fresh || synced.changed || extra) persistLocal();
+    } catch (err) {
+      /* 저장된 데이터가 예상과 달라도 화면은 그대로 뜨게 둔다 */
+    }
   }
 
   // 예전에 저장된 데모 데이터에도 새로 합류한 비서가 빠지지 않게 맞춰준다.
