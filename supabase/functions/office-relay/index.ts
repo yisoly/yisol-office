@@ -47,7 +47,7 @@ const ROOMS: Record<string, string> = {
 };
 
 const SENDERS: Record<string, string> = {
-  miu: "미우",
+  miu: "피클",
   claude: "클로드",
   muse: "뮤즈",
   keyring: "키링",

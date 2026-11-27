@@ -66,8 +66,8 @@
   const ASSISTANT_SEED = [
     {
       id: "miu",
-      name: "미우",
-      role: "메인비서 · 피클",
+      name: "피클",
+      role: "메인비서",
       avatar: "assets/avatars/miu.jpg",
       accent: "#7B4B24",
       status: "on",
@@ -497,7 +497,7 @@
           "· 돈이 나가거나 사람에게 닿는 일은 이솔 님 확인 후 실행.\n" +
           "· 매일 21시에 내일 일정 정리해서 올리기.",
         pinned: true,
-        author: "미우",
+        author: "피클",
         created_at: isoAgo(60 * 24 * 6),
         updated_at: isoAgo(60 * 20)
       },
@@ -549,7 +549,7 @@
           "· 로켓배송 새벽 도착은 전날 밤 12시 전 주문\n" +
           "· 리뷰는 사진 3장 + 2~3문장 개행",
         pinned: false,
-        author: "미우",
+        author: "피클",
         created_at: isoAgo(60 * 24 * 9),
         updated_at: isoAgo(60 * 40)
       },

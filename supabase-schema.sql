@@ -202,7 +202,7 @@ $$;
 -- ---------------------------------------------------------------------------
 insert into public.assistants (id, name, role, avatar, accent, status, areas, summary, sort_order)
 values
-  ('miu',     '미우',    '메인비서 · 피클',        'assets/avatars/miu.jpg', '#7B4B24', 'on', array['일정·브리핑','쿠팡·쇼핑','전화·예약','기억과 기록'], '비서실 문을 열었어요', 1),
+  ('miu',     '피클',    '메인비서',               'assets/avatars/miu.jpg', '#7B4B24', 'on', array['일정·브리핑','쿠팡·쇼핑','전화·예약','기억과 기록'], '비서실 문을 열었어요', 1),
   ('claude',  '클로드',  '맥 실무비서 · ai-office', 'assets/avatars/claude.jpg',      '#C96442', 'on', array['회계·급여','문서·계약','인사'], '맥 작업 공간에서 대기 중', 2),
   ('muse',    '뮤즈',    '서브비서',               'assets/avatars/muse.jpg',     '#7A6BB5', 'on', array['블로그·콘텐츠','리서치','체험단'], '콘텐츠 초안 준비 중', 3),
   ('keyring', '키링',    '서브비서',               'assets/avatars/keyring.jpg',     '#3E8E7E', 'on', array['배송·구매','생활 리마인드','기록 정리'], '배송·리마인드 정리 중', 4),
@@ -213,18 +213,18 @@ on conflict (id) do nothing;
 -- 시드: 첫 입장 메시지 (비어 있을 때만)
 insert into public.messages (room, sender_id, sender_name, role, kind, body)
 select 'boardroom', 'system', '비서실', 'system', 'system',
-       '이솔 비서실이 문을 열었어요 — 미우 · 클로드 · 뮤즈 · 키링 · 챗지피티 · 인스팅트가 들어와 있습니다.'
+       '이솔 비서실이 문을 열었어요 — 피클 · 클로드 · 뮤즈 · 키링 · 챗지피티 · 인스팅트가 들어와 있습니다.'
 where not exists (select 1 from public.messages);
 
 -- 인스팅트 합류 안내 (이미 비서실을 쓰고 있던 경우에도 한 번만 남는다)
 insert into public.messages (room, sender_id, sender_name, role, kind, body)
 select 'boardroom', 'system', '비서실', 'system', 'system',
-       '여섯 번째 비서 인스팅트가 합류했어요 — 미우 · 클로드 · 뮤즈 · 키링 · 챗지피티 · 인스팅트.'
+       '여섯 번째 비서 인스팅트가 합류했어요 — 피클 · 클로드 · 뮤즈 · 키링 · 챗지피티 · 인스팅트.'
 where not exists (select 1 from public.messages where body like '%인스팅트%');
 
 -- 시드: 운영 규칙 메모 (메모가 비어 있을 때만)
 insert into public.memos (title, body, pinned, author)
 select '비서실 운영 규칙',
        E'· 지시는 회의실에서, 실행은 작업실 카드로.\n· 보고는 ‘무엇을 · 언제 · 어디에’ 순서로.\n· 돈이 나가거나 사람에게 닿는 일은 확인 후 실행.',
-       true, '미우'
+       true, '피클'
 where not exists (select 1 from public.memos);
