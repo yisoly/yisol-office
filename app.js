@@ -1594,10 +1594,10 @@
     }
   }
 
-  // 기본 연결 창구 주소 = Supabase 프로젝트 주소 + /functions/v1/office-relay
+  // 기본 연결 창구 주소 = Supabase 프로젝트 주소 + /functions/v1/office-replay
   function defaultRelayEndpoint() {
     const base = String(CFG.SUPABASE_URL || "").trim().replace(/\/+$/, "");
-    return base ? base + "/functions/v1/office-relay" : "";
+    return base ? base + "/functions/v1/office-replay" : "";
   }
 
   function relayEndpoint() {
@@ -1858,7 +1858,7 @@
         '<div class="guide-step-head"><span class="guide-num">2</span>연결 창구 주소·열쇠</div>' +
         '<p class="guide-text">한 번만 올려두면 비서들이 주소를 열어 회의실을 읽고 직접 답을 남길 수 있어요.</p>' +
         '<label class="field"><span>연결 창구 주소</span><input type="text" id="relayUrlInput" spellcheck="false" autocomplete="off" value="' +
-        esc(relayEndpoint()) + '" placeholder="https://<프로젝트>.supabase.co/functions/v1/office-relay"></label>' +
+        esc(relayEndpoint()) + '" placeholder="https://<프로젝트>.supabase.co/functions/v1/office-replay"></label>' +
         '<label class="field"><span>열쇠 (RELAY_KEY · 이 브라우저에만 저장)</span><input type="text" id="relayKeyInput" spellcheck="false" autocomplete="off" value="' +
         esc(relayKey()) + '" placeholder="Supabase에 넣은 RELAY_KEY 값"></label>' +
         '<p class="guide-note">아직 창구를 안 올렸다면 — Supabase 대시보드 → <b>Edge Functions</b> → 새 함수 이름 <b>office-relay</b> → 저장소의 <b>supabase/functions/office-relay/index.ts</b> 전체를 붙여넣고 배포 → 시크릿에 <b>RELAY_KEY</b> 추가 → 함수의 <b>JWT 확인(Verify JWT)은 꺼 주세요</b>(열쇠가 대신 문을 지켜요).</p>' +
