@@ -123,7 +123,7 @@
       id: "instinct",
       name: "인스팅트",
       role: "서브비서 · 교본 보관",
-      avatar: "assets/avatars/instinct.jpg",
+      avatar: "assets/avatars/instinct-v2.jpg",
       accent: "#B8860B",
       status: "on",
       areas: ["교본·자료 정리", "지식 베이스", "아이디어"],

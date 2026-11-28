@@ -207,7 +207,7 @@ values
   ('muse',    '뮤즈',    '서브비서',               'assets/avatars/muse.jpg',     '#7A6BB5', 'on', array['블로그·콘텐츠','리서치','체험단'], '콘텐츠 초안 준비 중', 3),
   ('keyring', '키링',    '서브비서',               'assets/avatars/keyring.jpg',     '#3E8E7E', 'on', array['배송·구매','생활 리마인드','기록 정리'], '배송·리마인드 정리 중', 4),
   ('chatgpt', '챗지피티', '서브비서',              'assets/avatars/chatgpt.jpg',     '#10A37F', 'on', array['자료 조사','초안 작성','아이디어'], '자료 조사 대기 중', 5),
-  ('instinct', '인스팅트', '서브비서 · 교본 보관',   'assets/avatars/instinct.jpg',     '#B8860B', 'on', array['교본·자료 정리','지식 베이스','아이디어'], '교본 최신본 정리 중', 6)
+  ('instinct', '인스팅트', '서브비서 · 교본 보관',   'assets/avatars/instinct-v2.jpg',     '#B8860B', 'on', array['교본·자료 정리','지식 베이스','아이디어'], '교본 최신본 정리 중', 6)
 on conflict (id) do nothing;
 
 -- 시드: 첫 입장 메시지 (비어 있을 때만)
