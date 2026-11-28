@@ -45,14 +45,6 @@
     }
   ];
 
-  const TASK_COLUMNS = [
-    { key: "doing", label: "진행중", empty: "지금 도는 일이 없어요." },
-    { key: "todo", label: "대기", empty: "기다리는 일이 없어요." },
-    { key: "done", label: "완료", empty: "아직 완료된 일이 없어요." }
-  ];
-
-  const STATE_LABEL = { on: "ON", standby: "대기", off: "오프" };
-
   /* 비서별 아바타 사진과, 사진이 안 뜰 때의 이모지 폴백 */
   const AVATAR_EMOJI = {
     miu: "🐈‍⬛",
@@ -133,7 +125,6 @@
   ];
 
   const LS_KEY = "yisol-office.v1";
-  const TABS = ["meeting", "tasks", "team", "memos"];
   // publishable(sb_publishable_…) 키를 정식으로 인식하는 버전으로 고정
   const SDK_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2/dist/umd/supabase.js";
 
@@ -142,18 +133,13 @@
   const db = { messages: [], tasks: [], assistants: [], memos: [] };
 
   const state = {
-    tab: "meeting",
     room: "boardroom",
     recipient: "all",
-    taskFilter: "all",
-    taskAssignee: "all",
     conn: "demo", // demo | connecting | live | error | auth
     auth: "off", // off(데모/인증 미설정) | checking | out | in
     userEmail: "",
     stick: true,
     sending: false,
-    memoTarget: null,
-    taskTarget: null,
     guideSender: "claude",
     ready: false
   };
@@ -256,27 +242,6 @@
     if (days < 7) return days + "일 전";
     const d = new Date(iso);
     return d.getMonth() + 1 + "/" + d.getDate();
-  }
-
-  function fmtDateShort(value) {
-    if (!value) return "";
-    const raw = String(value);
-    const d = new Date(raw.length <= 10 ? raw + "T00:00:00" : raw);
-    if (isNaN(d.getTime())) return raw;
-    return d.getMonth() + 1 + "/" + d.getDate();
-  }
-
-  function fmtDue(value) {
-    if (!value) return { text: "", cls: "" };
-    const raw = String(value);
-    const d = new Date(raw.length <= 10 ? raw + "T00:00:00" : raw);
-    if (isNaN(d.getTime())) return { text: raw, cls: "" };
-    const diff = Math.round((startOfDay(d) - startOfDay(new Date())) / 86400000);
-    if (diff === 0) return { text: "오늘 마감", cls: "is-today" };
-    if (diff === 1) return { text: "내일 마감", cls: "" };
-    if (diff === -1) return { text: "어제 마감", cls: "is-over" };
-    if (diff < 0) return { text: -diff + "일 지남", cls: "is-over" };
-    return { text: d.getMonth() + 1 + "/" + d.getDate() + " 마감", cls: "" };
   }
 
   function roomById(id) {
@@ -1079,14 +1044,11 @@
 
   function renderTable(table) {
     if (table === "messages") renderChat();
-    if (table === "tasks") renderTasks();
     if (table === "assistants") {
-      renderTeam();
       renderRoomTabs();
       renderRoomStatus();
       renderRecipients();
     }
-    if (table === "memos") renderMemos();
   }
 
   /* ---------------------------------------------------------------- CRUD */
@@ -1147,7 +1109,7 @@
     if (state.conn === "live") {
       cls = "is-live";
       label = "실시간 연결";
-      tip = "Supabase 실시간 동기화 중 — messages · tasks · assistants · memos";
+      tip = "Supabase 실시간 동기화 중 — messages · assistants";
     } else if (state.conn === "connecting") {
       cls = "is-connecting";
       label = "연결 중…";
@@ -1178,10 +1140,6 @@
     renderRoomStatus();
     renderRecipients();
     renderChat();
-    renderTasks();
-    renderTeam();
-    renderMemos();
-    applyTab(state.tab);
   }
 
   /* ---------------------------------------------------------------- 렌더: 회의실 */
@@ -1301,188 +1259,7 @@
     box.scrollTop = box.scrollHeight;
   }
 
-  /* ---------------------------------------------------------------- 렌더: 작업실 */
-
-  function renderTasks() {
-    const board = $("#board");
-    if (!board) return;
-
-    renderTaskFilters();
-
-    const filtering = state.taskFilter !== "all";
-    board.style.gridTemplateColumns = filtering ? "minmax(0, 1fr)" : "";
-    board.classList.toggle("is-single", filtering);
-
-    const columns = filtering ? TASK_COLUMNS.filter((c) => c.key === state.taskFilter) : TASK_COLUMNS;
-
-    board.innerHTML = columns
-      .map((col) => {
-        const cards = db.tasks
-          .filter((t) => t.status === col.key)
-          .filter((t) => state.taskAssignee === "all" || t.assignee === state.taskAssignee)
-          .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || new Date(a.created_at) - new Date(b.created_at));
-
-        return (
-          '<section class="column" aria-label="' + col.label + '">' +
-          '<div class="column-head"><span>' + col.label + '</span><span class="count">' + cards.length + "</span></div>" +
-          (cards.length ? cards.map(taskCard).join("") : '<p class="col-empty">' + esc(col.empty) + "</p>") +
-          "</section>"
-        );
-      })
-      .join("");
-  }
-
-  function renderTaskFilters() {
-    const statusWrap = $("#statusFilter");
-    const assigneeWrap = $("#assigneeFilter");
-    if (!statusWrap || !assigneeWrap) return;
-
-    const statusChips = [{ key: "all", label: "전체" }].concat(
-      TASK_COLUMNS.map((c) => ({ key: c.key, label: c.label }))
-    );
-    statusWrap.innerHTML = statusChips
-      .map((c) => {
-        const n = c.key === "all" ? db.tasks.length : db.tasks.filter((t) => t.status === c.key).length;
-        return (
-          '<button type="button" class="chip' + (state.taskFilter === c.key ? " is-active" : "") +
-          '" data-filter="status" data-value="' + c.key + '" aria-pressed="' + (state.taskFilter === c.key) + '">' +
-          c.label + '<span class="n">' + n + "</span></button>"
-        );
-      })
-      .join("");
-
-    const assigneeChips = [{ id: "all", name: "전체 담당", face: '<span class="emoji" aria-hidden="true">👥</span>' }].concat(
-      db.assistants.map((a) => ({ id: a.id, name: a.name, face: chipAvatar(a) }))
-    );
-    assigneeWrap.innerHTML = assigneeChips
-      .map((a) => {
-        const active = state.taskAssignee === a.id;
-        const n = a.id === "all" ? db.tasks.length : db.tasks.filter((t) => t.assignee === a.id).length;
-        return (
-          '<button type="button" class="chip' + (active ? " is-active" : "") + '" data-filter="assignee" data-value="' +
-          esc(a.id) + '" aria-pressed="' + active + '">' + a.face + " " +
-          esc(a.name) + '<span class="n">' + n + "</span></button>"
-        );
-      })
-      .join("");
-  }
-
-  function taskCard(task) {
-    const a = assistantById(task.assignee);
-    const due =
-      task.status === "done"
-        ? { text: task.due_date ? "마감 " + fmtDateShort(task.due_date) : "", cls: "" }
-        : fmtDue(task.due_date);
-    const detail = task.detail
-      ? '<p class="task-detail">' + esc(task.detail) + "</p>"
-      : "";
-    return (
-      '<article class="task-card" data-id="' + esc(task.id) + '">' +
-      '<div class="task-top">' +
-      '<span class="assignee-tag">' + chipAvatar(a) + esc(a.name) + "</span>" +
-      (due.text ? '<span class="due ' + due.cls + '">' + esc(due.text) + "</span>" : "") +
-      "</div>" +
-      '<h3 class="task-title">' + esc(task.title) + "</h3>" + detail +
-      '<div class="task-foot">' +
-      '<select class="task-status-select is-' + esc(task.status) + '" data-action="task-status" data-id="' + esc(task.id) +
-      '" aria-label="상태 변경">' +
-      TASK_COLUMNS.map(
-        (c) => '<option value="' + c.key + '"' + (task.status === c.key ? " selected" : "") + ">" + c.label + "</option>"
-      ).join("") +
-      "</select>" +
-      '<div class="task-actions">' +
-      '<button type="button" class="icon-btn" data-action="task-edit" data-id="' + esc(task.id) + '" aria-label="작업 수정" title="수정">✎</button>' +
-      '<button type="button" class="icon-btn danger" data-action="task-delete" data-id="' + esc(task.id) + '" aria-label="작업 삭제" title="삭제">✕</button>' +
-      "</div></div></article>"
-    );
-  }
-
-  /* ---------------------------------------------------------------- 렌더: 비서현황 */
-
-  function renderTeam() {
-    const grid = $("#teamGrid");
-    if (!grid) return;
-    const count = $("#teamCount");
-    if (count) count.textContent = "ON " + db.assistants.filter((a) => a.status === "on").length + "명";
-
-    grid.innerHTML = db.assistants
-      .slice()
-      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
-      .map((a) => {
-        const stateButtons = ["on", "standby", "off"]
-          .map(
-            (s) =>
-              '<button type="button" data-action="set-state" data-id="' + esc(a.id) + '" data-state="' + s +
-              '" class="' + (a.status === s ? "is-active" : "") + '" aria-pressed="' + (a.status === s) + '">' +
-              STATE_LABEL[s] + "</button>"
-          )
-          .join("");
-        return (
-          '<article class="team-card" style="--accent:' + esc(a.accent || "#7B4B24") + '" data-id="' + esc(a.id) + '">' +
-          '<div class="team-head">' +
-          avatarMarkup(a, "avatar lg") +
-          '<div class="team-id"><h3>' + esc(a.name) + "</h3><p>" + esc(a.role) + "</p></div>" +
-          '<div class="state-switch" role="group" aria-label="' + esc(a.name) + ' 상태 변경">' + stateButtons + "</div>" +
-          "</div>" +
-          '<div class="areas">' + (a.areas || []).map((x) => '<span class="area">' + esc(x) + "</span>").join("") + "</div>" +
-          '<p class="team-summary"><span class="label">최근 활동</span>' + esc(a.summary || "—") + "</p>" +
-          '<div class="team-foot"><span>' + esc(fmtRelative(a.updated_at)) + " 업데이트</span>" +
-          '<button type="button" class="ghost-btn" data-action="team-message" data-id="' + esc(a.id) + '">메시지</button>' +
-          "</div></article>"
-        );
-      })
-      .join("");
-  }
-
-  /* ---------------------------------------------------------------- 렌더: 메모 */
-
-  function renderMemos() {
-    const grid = $("#memoGrid");
-    if (!grid) return;
-
-    const memos = db.memos.slice().sort((a, b) => {
-      if (!!b.pinned !== !!a.pinned) return b.pinned ? 1 : -1;
-      return new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0);
-    });
-
-    if (!memos.length) {
-      grid.innerHTML = '<p class="col-empty" style="grid-column:1/-1">메모가 없어요. ‘+ 새 메모’로 첫 메모를 남겨보세요.</p>';
-      return;
-    }
-
-    grid.innerHTML = memos
-      .map(
-        (memo) =>
-          '<article class="memo-card' + (memo.pinned ? " is-pinned" : "") + '" data-id="' + esc(memo.id) + '">' +
-          '<div class="memo-head"><h3>' + esc(memo.title || "제목 없음") + "</h3>" +
-          '<button type="button" class="pin-btn' + (memo.pinned ? " is-on" : "") + '" data-action="memo-pin" data-id="' +
-          esc(memo.id) + '" aria-label="' + (memo.pinned ? "고정 해제" : "위에 고정") + '" aria-pressed="' + !!memo.pinned + '" title="' +
-          (memo.pinned ? "고정 해제" : "위에 고정") + '">📌</button></div>' +
-          '<p class="memo-body" data-action="memo-edit" data-id="' + esc(memo.id) + '" title="눌러서 열기">' + esc(memo.body || "") + "</p>" +
-          '<div class="memo-foot"><span>' + esc(memo.author || CFG.OWNER_NAME) + " · " +
-          esc(fmtRelative(memo.updated_at || memo.created_at)) + "</span>" +
-          '<div class="memo-actions">' +
-          '<button type="button" class="icon-btn" data-action="memo-edit" data-id="' + esc(memo.id) + '" aria-label="메모 수정" title="수정">✎</button>' +
-          '<button type="button" class="icon-btn danger" data-action="memo-delete" data-id="' + esc(memo.id) + '" aria-label="메모 삭제" title="삭제">✕</button>' +
-          "</div></div></article>"
-      )
-      .join("");
-  }
-
-  /* ---------------------------------------------------------------- 탭/방 전환 */
-
-  function applyTab(tab) {
-    state.tab = TABS.indexOf(tab) === -1 ? "meeting" : tab;
-    $$(".tab").forEach((btn) => {
-      const active = btn.dataset.tab === state.tab;
-      btn.classList.toggle("is-active", active);
-      btn.setAttribute("aria-selected", String(active));
-    });
-    $$(".view").forEach((view) => {
-      view.classList.toggle("is-active", view.dataset.view === state.tab);
-    });
-    if (state.tab === "meeting" && state.stick) scrollToBottom();
-  }
+  /* ---------------------------------------------------------------- 방 전환 */
 
   function setRoom(roomId) {
     if (!roomById(roomId)) return;
@@ -1760,7 +1537,7 @@
 
     const head =
       "[이솔 비서실 · " + name + " 연결]\n" +
-      "아래 주소로 이솔 비서실 「대회의실」의 최근 대화·진행 중 작업·비서 상태를 읽고, " +
+      "아래 주소로 이솔 비서실 「대회의실」의 최근 대화·비서 상태를 읽고, " +
       "네 이름(" + name + ")으로 답을 남길 수 있어.\n";
     const readBlock = "\n■ 읽기\n" + read + "\n";
     const tail =
@@ -1774,9 +1551,6 @@
         "\n■ 내 답 올리기 (터미널)\n" +
         'curl -s -G "' + base + '"' + enc + '"key=' + key + '"' + enc + '"action=send"' +
         enc + '"room=boardroom"' + enc + '"sender=claude"' + enc + '"body=보고 내용"\n' +
-        "\n■ 작업실에 카드 추가 (선택)\n" +
-        'curl -s -G "' + base + '"' + enc + '"key=' + key + '"' + enc + '"action=task"' +
-        enc + '"title=할 일 제목"' + enc + '"assignee=claude"\n' +
         tail
       );
     }
@@ -1927,125 +1701,6 @@
     });
   }
 
-  function openTaskModal(task) {
-    const editing = !!task;
-    const options = db.assistants
-      .map(
-        (a) =>
-          '<option value="' + esc(a.id) + '"' + (editing && task.assignee === a.id ? " selected" : "") + ">" +
-          esc(avatarFallback(a)) + " " + esc(a.name) + "</option>"
-      )
-      .join("");
-    const statusOptions = TASK_COLUMNS.map(
-      (c) => '<option value="' + c.key + '"' + (editing && task.status === c.key ? " selected" : !editing && c.key === "todo" ? " selected" : "") + ">" + c.label + "</option>"
-    ).join("");
-
-    openModal(
-      "<h3>" + (editing ? "작업 수정" : "새 작업") + "</h3>" +
-        '<p class="modal-sub">담당 비서와 상태를 정하면 작업실 카드로 쌓입니다.</p>' +
-        '<form id="taskForm">' +
-        '<label class="field"><span>제목</span><input type="text" name="title" maxlength="120" required value="' +
-        esc(editing ? task.title : "") + '" placeholder="예: 12월 수영 신규 예약 알림"></label>' +
-        '<label class="field"><span>상세 메모 (선택)</span><textarea name="detail" maxlength="1000" placeholder="무엇을, 언제까지">' +
-        esc(editing ? task.detail || "" : "") + "</textarea></label>" +
-        '<div class="field-row">' +
-        '<label class="field"><span>담당</span><select name="assignee">' + options + "</select></label>" +
-        '<label class="field"><span>상태</span><select name="status">' + statusOptions + "</select></label>" +
-        "</div>" +
-        '<label class="field"><span>마감일 (선택)</span><input type="date" name="due_date" value="' +
-        esc(editing && task.due_date ? String(task.due_date).slice(0, 10) : "") + '"></label>' +
-        '<div class="modal-actions"><button type="button" class="btn-ghost" data-action="close-modal">취소</button>' +
-        '<button type="submit" class="btn-primary">' + (editing ? "저장" : "추가") + "</button></div>" +
-        "</form>"
-    );
-
-    $("#taskForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const form = e.currentTarget;
-      const data = {
-        title: form.title.value.trim(),
-        detail: form.detail.value.trim(),
-        assignee: form.assignee.value,
-        status: form.status.value,
-        due_date: form.due_date.value || null
-      };
-      if (!data.title) {
-        toast("제목을 적어주세요.");
-        return;
-      }
-      try {
-        if (editing) {
-          const saved = await apiUpdate("tasks", task.id, data);
-          if (saved) applyRow("tasks", saved);
-        } else {
-          const row = Object.assign({}, data, { sort_order: db.tasks.length + 1 });
-          if (!client) {
-            row.id = uid("task");
-            row.created_at = nowIso();
-          }
-          const saved = await apiInsert("tasks", row);
-          applyRow("tasks", saved);
-        }
-        closeModal();
-        renderTasks();
-        toast(editing ? "작업을 수정했어요." : "작업을 추가했어요.");
-      } catch (err) {
-        toast("저장하지 못했어요: " + (err.message || err));
-      }
-    });
-  }
-
-  function openMemoModal(memo) {
-    const editing = !!memo;
-    openModal(
-      "<h3>" + (editing ? "메모 수정" : "새 메모") + "</h3>" +
-        '<p class="modal-sub">여섯 명이 함께 보는 메모장이에요.</p>' +
-        '<form id="memoForm">' +
-        '<label class="field"><span>제목</span><input type="text" name="title" maxlength="80" required value="' +
-        esc(editing ? memo.title : "") + '" placeholder="예: 비서실 운영 규칙"></label>' +
-        '<label class="field"><span>내용</span><textarea name="body" maxlength="4000" placeholder="자유롭게 적어두세요">' +
-        esc(editing ? memo.body : "") + "</textarea></label>" +
-        '<label class="check-row"><input type="checkbox" name="pinned"' + (editing && memo.pinned ? " checked" : "") +
-        "> 위에 고정하기</label>" +
-        '<div class="modal-actions"><button type="button" class="btn-ghost" data-action="close-modal">취소</button>' +
-        '<button type="submit" class="btn-primary">' + (editing ? "저장" : "메모 추가") + "</button></div>" +
-        "</form>"
-    );
-
-    $("#memoForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const form = e.currentTarget;
-      const data = {
-        title: form.title.value.trim(),
-        body: form.body.value,
-        pinned: form.pinned.checked
-      };
-      if (!data.title) {
-        toast("제목을 적어주세요.");
-        return;
-      }
-      try {
-        if (editing) {
-          const saved = await apiUpdate("memos", memo.id, data);
-          if (saved) applyRow("memos", saved);
-        } else {
-          const row = Object.assign({}, data, { author: CFG.OWNER_NAME });
-          if (!client) {
-            row.id = uid("memo");
-            row.created_at = nowIso();
-          }
-          const saved = await apiInsert("memos", row);
-          applyRow("memos", saved);
-        }
-        closeModal();
-        renderMemos();
-        toast(editing ? "메모를 저장했어요." : "메모를 추가했어요.");
-      } catch (err) {
-        toast("저장하지 못했어요: " + (err.message || err));
-      }
-    });
-  }
-
   /* ---------------------------------------------------------------- 이벤트 */
 
   function bindEvents() {
@@ -2119,12 +1774,6 @@
   }
 
   async function onClick(e) {
-    const tabBtn = e.target.closest("[data-tab]");
-    if (tabBtn) {
-      applyTab(tabBtn.dataset.tab);
-      return;
-    }
-
     const roomBtn = e.target.closest("[data-room]");
     if (roomBtn) {
       setRoom(roomBtn.dataset.room);
@@ -2137,14 +1786,6 @@
       renderRecipients();
       const input = $("#messageInput");
       if (input) input.focus();
-      return;
-    }
-
-    const filterBtn = e.target.closest("[data-filter]");
-    if (filterBtn) {
-      if (filterBtn.dataset.filter === "status") state.taskFilter = filterBtn.dataset.value;
-      else state.taskAssignee = filterBtn.dataset.value;
-      renderTasks();
       return;
     }
 
@@ -2198,130 +1839,6 @@
       await loadOffice();
       return;
     }
-
-    if (action === "new-task") {
-      openTaskModal(null);
-      return;
-    }
-
-    if (action === "new-memo") {
-      openMemoModal(null);
-      return;
-    }
-
-    if (action === "set-state") {
-      const next = actionEl.dataset.state;
-      const a = assistantById(id);
-      try {
-        const saved = await apiUpdate("assistants", id, { status: next });
-        if (saved) applyRow("assistants", saved);
-        else {
-          const row = db.assistants.find((x) => x.id === id);
-          if (row) row.status = next;
-        }
-        renderTeam();
-        renderRoomTabs();
-        renderRoomStatus();
-        toast(a.name + " 상태를 ‘" + STATE_LABEL[next] + "’로 바꿨어요.");
-      } catch (err) {
-        toast("상태를 바꾸지 못했어요: " + (err.message || err));
-      }
-      return;
-    }
-
-    if (action === "team-message") {
-      const a = assistantById(id);
-      const room = roomById(state.room);
-      if (room.members.indexOf(id) === -1) setRoom("boardroom");
-      state.recipient = id;
-      applyTab("meeting");
-      renderRecipients();
-      const input = $("#messageInput");
-      if (input) {
-        input.focus();
-        toast(a.name + "에게 보낼 메시지를 적어주세요.");
-      }
-      return;
-    }
-
-    if (action === "task-edit") {
-      const task = db.tasks.find((t) => t.id === id);
-      if (task) openTaskModal(task);
-      return;
-    }
-
-    if (action === "task-delete") {
-      const task = db.tasks.find((t) => t.id === id);
-      if (!task) return;
-      confirmModal("작업을 지울까요?", "‘" + task.title + "’ 카드가 사라집니다.", async () => {
-        try {
-          await apiDelete("tasks", id);
-          db.tasks = db.tasks.filter((t) => t.id !== id);
-          renderTasks();
-          toast("작업을 지웠어요.");
-        } catch (err) {
-          toast("지우지 못했어요: " + (err.message || err));
-        }
-      });
-      return;
-    }
-
-    if (action === "memo-edit") {
-      const memo = db.memos.find((m) => m.id === id);
-      if (memo) openMemoModal(memo);
-      return;
-    }
-
-    if (action === "memo-pin") {
-      const memo = db.memos.find((m) => m.id === id);
-      if (!memo) return;
-      try {
-        const saved = await apiUpdate("memos", id, { pinned: !memo.pinned });
-        if (saved) applyRow("memos", saved);
-        else memo.pinned = !memo.pinned;
-        renderMemos();
-        toast(memo.pinned ? "위에 고정했어요." : "고정을 풀었어요.");
-      } catch (err) {
-        toast("고정 상태를 바꾸지 못했어요: " + (err.message || err));
-      }
-      return;
-    }
-
-    if (action === "memo-delete") {
-      const memo = db.memos.find((m) => m.id === id);
-      if (!memo) return;
-      confirmModal("메모를 지울까요?", "‘" + (memo.title || "제목 없음") + "’ 메모가 사라집니다.", async () => {
-        try {
-          await apiDelete("memos", id);
-          db.memos = db.memos.filter((m) => m.id !== id);
-          renderMemos();
-          toast("메모를 지웠어요.");
-        } catch (err) {
-          toast("지우지 못했어요: " + (err.message || err));
-        }
-      });
-    }
-  }
-
-  function bindChange() {
-    document.addEventListener("change", async (e) => {
-      const select = e.target.closest('[data-action="task-status"]');
-      if (!select) return;
-      const id = select.dataset.id;
-      const next = select.value;
-      const task = db.tasks.find((t) => t.id === id);
-      if (!task) return;
-      try {
-        const saved = await apiUpdate("tasks", id, { status: next });
-        if (saved) applyRow("tasks", saved);
-        else task.status = next;
-        renderTasks();
-        toast("‘" + task.title + "’ → " + (TASK_COLUMNS.find((c) => c.key === next) || {}).label);
-      } catch (err) {
-        toast("상태를 바꾸지 못했어요: " + (err.message || err));
-        renderTasks();
-      }
-    });
   }
 
   /* ---------------------------------------------------------------- 시작 */
@@ -2334,7 +1851,6 @@
       CFG.SUPABASE_ANON_KEY.trim().length > 20;
 
     bindEvents();
-    bindChange();
 
     // Supabase를 안 쓰는 로컬 데모 모드: 로그인 없이 바로 연다.
     if (!hasRemote) {
