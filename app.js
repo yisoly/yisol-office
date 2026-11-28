@@ -101,7 +101,7 @@
       id: "keyring",
       name: "키링",
       role: "서브비서",
-      avatar: "assets/avatars/keyring.jpg",
+      avatar: "assets/avatars/keyring-v2.jpg",
       accent: "#3E8E7E",
       status: "on",
       areas: ["배송·구매", "생활 리마인드", "기록 정리"],
